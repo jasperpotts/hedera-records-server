@@ -56,7 +56,6 @@ public class BalancesService implements Service {
     @Override
     public void update(Routing.Rules rules) {
         rules.get("/", this::getDefaultMessageHandler);
-        rules.get("/greet-count", this::countAccess, this::getDefaultMessageHandler);
     }
 
     private void getDefaultMessageHandler(ServerRequest request, ServerResponse response) {

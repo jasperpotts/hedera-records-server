@@ -10,6 +10,7 @@ import io.helidon.webserver.Service;
 import jakarta.json.Json;
 import jakarta.json.JsonArrayBuilder;
 import jakarta.json.JsonBuilderFactory;
+import jakarta.json.JsonObject;
 import jakarta.json.JsonObjectBuilder;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
@@ -20,6 +21,7 @@ import org.apache.pinot.client.ResultSetGroup;
 import org.eclipse.microprofile.metrics.Counter;
 import org.eclipse.microprofile.metrics.MetricRegistry;
 
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -27,6 +29,7 @@ import java.util.Optional;
 import java.util.logging.Logger;
 
 import static com.swirlds.recordserver.util.QueryParamUtil.parseLimitQueryString;
+import static com.swirlds.recordserver.util.Utils.parseFromColumn;
 
 /**
  * A simple service to greet you. Examples:
@@ -56,31 +59,22 @@ public class BlocksService implements Service {
     @Override
     public void update(Routing.Rules rules) {
         rules.get("/", this::getDefaultMessageHandler);
-        rules.get("/greet-count", this::countAccess, this::getDefaultMessageHandler);
     }
 
     private void getDefaultMessageHandler(ServerRequest request, ServerResponse response) {
-        final Optional<String> accountIdParam = request.queryParams().first("account.id");
-        final Optional<String> accountBalanceQueryParam = request.queryParams().first("account.balance");
-        final Optional<String> accountPubKeyParam = request.queryParams().first("account.publickey");
+        final Optional<String> blockNumberQueryParam = request.queryParams().first("block.number");
         final Optional<String> timestampsParam = request.queryParams().first("timestamp");
         final Optional<String> limitParam = request.queryParams().first("limit");
         final Optional<String> orderParam = request.queryParams().first("order");
 
-        // TODO if accountPubKeyParam is set then need to query accounts table to get account ID from public key, then look
-
         // build and execute query
         final List<QueryParamUtil.WhereClause> whereClauses = new ArrayList<>();
-
-        accountIdParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._long,"account_id",s)));
-
-        accountBalanceQueryParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._long,"balance",s)));
+        blockNumberQueryParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._long,"number",s)));
         timestampsParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._long,"consensus_timestamp",s)));
         final String whereClause = whereClauses.isEmpty() ? "" : "where "+QueryParamUtil.whereClausesToQuery(whereClauses);
         final String queryString =
                 "select address_books, consensus_end_timestamp, consensus_start_timestamp, data_hash, fields_1, number, prev_hash, signature_files_1 from record_new " +
                         whereClause+" order by number "+QueryParamUtil.Order.parse(orderParam).toString()+" limit ?";
-        System.out.println("queryString = " + queryString);
         final PreparedStatement statement = this.pinotConnection.prepareStatement(new Request("sql",queryString));
         QueryParamUtil.applyWhereClausesToQuery(whereClauses, statement);
         statement.setInt(whereClauses.size(), parseLimitQueryString(limitParam)); // limit
@@ -93,20 +87,21 @@ public class BlocksService implements Service {
         for (int i = 0; i < resultTableResultSet.getRowCount(); i++) {
             final long blockNum = resultTableResultSet.getLong(i,5);
             highestAccountNumber = Math.max(highestAccountNumber,blockNum);
+            final JsonObject fields = parseFromColumn(resultTableResultSet.getString(i,4));
             balancesArray.add(JSON.createObjectBuilder()
                     .add("count",1)
-                    .add("hapi_version","TODO")
-                    .add("hash","0x"+ resultTableResultSet.getString(3))
-                    .add("name","TODO.rcd")
+                    .add("hapi_version",fields.getString("hapi_version"))
+                    .add("hash","0x"+ resultTableResultSet.getString(i, 3))
+                    .add("name",fields.getString("name"))
                     .add("number",blockNum)
                     .add("prev_hash","0x"+resultTableResultSet.getString(i,6))
-                    .add("size","TODO")
+                    .add("size",fields.getString("size"))
                     .add("timestamp",JSON.createObjectBuilder()
                             .add("from",resultTableResultSet.getLong(i,2))
                             .add("to",resultTableResultSet.getLong(i,1))
                             .build())
-                    .add("gas_used","TODO")
-                    .add("logs_bloom","TODO")
+                    .add("gas_used",fields.getString("gas_used"))
+                    .add("logs_bloom",fields.getString("logs_bloom"))
                     .build());
         }
         final JsonObjectBuilder returnObject = JSON.createObjectBuilder()

@@ -1,15 +1,25 @@
 ### get balances default
 GET http://localhost:8080/api/v1/balances
 Accept: application/json
-
 ### get balances for account 5
 GET http://localhost:8080/api/v1/balances?account.id=5
 Accept: application/json
-
 ### get balances for account 0.0.5
 GET http://localhost:8080/api/v1/balances?account.id=0.0.5
 Accept: application/json
 
 ### get blocks default
 GET http://localhost:8080/api/v1/blocks
+Accept: application/json
+### get block 125
+GET http://localhost:8080/api/v1/blocks?block.number=125
+Accept: application/json
+### get block > 1000
+GET http://localhost:8080/api/v1/blocks?block.number=gt:1000
+Accept: application/json
+### get blocks desc order
+GET http://localhost:8080/api/v1/blocks?order=desc
+Accept: application/json
+### get blocks desc order limit 5
+GET http://localhost:8080/api/v1/blocks?order=desc&limit=5
 Accept: application/json

@@ -1,6 +1,11 @@
 package com.swirlds.recordserver.util;
 
+import jakarta.json.Json;
+import jakarta.json.JsonObject;
+import jakarta.json.stream.JsonParser;
+
 import java.io.IOException;
+import java.io.StringReader;
 import java.math.BigInteger;
 import java.net.URL;
 import java.nio.ByteBuffer;
@@ -21,6 +26,21 @@ public class Utils {
 	private static final byte[] HEX_ARRAY = "0123456789ABCDEF".getBytes(StandardCharsets.US_ASCII);
 	private static final Base64.Encoder BASE64_ENCODER = Base64.getEncoder();
 	private static final BigInteger SECONDS_TO_NANOSECONDS = BigInteger.valueOf(1_000_000_000L);
+
+	/**
+	 * Extract and parse JSON Object from column content string, returning empty object if the column is null, or empty
+	 */
+	public static JsonObject parseFromColumn(String columnContent) {
+		if (columnContent != null && !columnContent.isEmpty()) {
+			try (final JsonParser parser = Json.createParser(new StringReader(columnContent))) {
+				if (parser.hasNext()) {
+					parser.next();
+					return parser.getObject();
+				}
+			}
+		}
+		return Json.createObjectBuilder().build();
+	}
 
 	public static void failWithError(Throwable e) {
 		e.printStackTrace();
