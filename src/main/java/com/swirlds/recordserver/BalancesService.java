@@ -29,12 +29,7 @@ import java.util.logging.Logger;
 import static com.swirlds.recordserver.util.QueryParamUtil.parseLimitQueryString;
 
 /**
- * A simple service to greet you. Examples:
- *
- * Get default greeting message:
- * curl -X GET http://localhost:8080/simple-greet
- *
- * The message is returned as a JSON object
+ * A service for balances API
  */
 public class BalancesService implements Service {
 
@@ -106,10 +101,5 @@ public class BalancesService implements Service {
                         .build())
                 ;
         response.send(returnObject.build());
-    }
-
-    private void countAccess(ServerRequest request, ServerResponse response) {
-        accessCtr.inc();
-        request.next();
     }
 }

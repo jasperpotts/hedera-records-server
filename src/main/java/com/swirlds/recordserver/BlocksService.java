@@ -21,7 +21,6 @@ import org.apache.pinot.client.ResultSetGroup;
 import org.eclipse.microprofile.metrics.Counter;
 import org.eclipse.microprofile.metrics.MetricRegistry;
 
-import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -32,12 +31,7 @@ import static com.swirlds.recordserver.util.QueryParamUtil.parseLimitQueryString
 import static com.swirlds.recordserver.util.Utils.parseFromColumn;
 
 /**
- * A simple service to greet you. Examples:
- *
- * Get default greeting message:
- * curl -X GET http://localhost:8080/simple-greet
- *
- * The message is returned as a JSON object
+ * A service for blocks API
  */
 public class BlocksService implements Service {
 
@@ -112,49 +106,4 @@ public class BlocksService implements Service {
                 ;
         response.send(returnObject.build());
     }
-
-    private void countAccess(ServerRequest request, ServerResponse response) {
-        accessCtr.inc();
-        request.next();
-    }
 }
-
-/*
-{
-  "blocks": [
-    {
-      "count": 1,
-      "hapi_version": "null.null.null",
-      "hash": "0x420fffe68fcd2a1eadcce589fdf9565bcf5a269d02232fe07cdc565b3b6f76ce46a9418ddc1bbe051d4894e04d091f8e",
-      "name": "2019-09-13T21_53_51.396440Z.rcd",
-      "number": 0,
-      "previous_hash": "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-      "size": null,
-      "timestamp": {
-        "from": "1568411631.396440000",
-        "to": "1568411631.396440000"
-      },
-      "gas_used": 0,
-      "logs_bloom": "0x"
-    },
-    {
-      "count": 1,
-      "hapi_version": "null.null.null",
-      "hash": "0xd84193b8a421cee8035fccbce280c89f79509aa86969c1a425337b7218e9474121254ce71aa3952fc909ac240bec2e5f",
-      "name": "2019-09-13T21_54_30.872035001Z.rcd",
-      "number": 1,
-      "previous_hash": "0x420fffe68fcd2a1eadcce589fdf9565bcf5a269d02232fe07cdc565b3b6f76ce46a9418ddc1bbe051d4894e04d091f8e",
-      "size": null,
-      "timestamp": {
-        "from": "1568411670.872035001",
-        "to": "1568411670.872035001"
-      },
-      "gas_used": 0,
-      "logs_bloom": "0x"
-    }
-  ],
-  "links": {
-    "next": "/api/v1/blocks?order=asc&limit=2&block.number=gt:0"
-  }
-}
- */
