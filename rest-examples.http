@@ -1,0 +1,15 @@
+### get balances default
+GET http://localhost:8080/api/v1/balances
+Accept: application/json
+
+### get balances for account 5
+GET http://localhost:8080/api/v1/balances?account.id=5
+Accept: application/json
+
+### get balances for account 0.0.5
+GET http://localhost:8080/api/v1/balances?account.id=0.0.5
+Accept: application/json
+
+### get blocks default
+GET http://localhost:8080/api/v1/blocks
+Accept: application/json

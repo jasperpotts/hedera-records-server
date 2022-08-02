@@ -1,0 +1,62 @@
+apply plugin: 'java'
+apply plugin: 'idea'
+apply plugin: 'application'
+apply plugin: 'com.github.johnrengelman.shadow'
+
+group 'com.swirlds.recordsserver'
+version '1.0-SNAPSHOT'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+repositories {
+	maven { url "https://plugins.gradle.org/m2/" }
+	mavenCentral()
+}
+
+buildscript {
+	repositories {
+		maven { url "https://plugins.gradle.org/m2/" }
+	}
+	dependencies {
+		classpath "gradle.plugin.com.github.johnrengelman:shadow:7.1.2"
+	}
+}
+
+application {
+	mainClass.set('com.swirlds.recordserver.Main')
+}
+
+dependencies {
+	implementation platform("io.helidon:helidon-dependencies:3.0.0")
+	implementation 'io.helidon.webserver:helidon-webserver'
+	implementation 'io.helidon.media:helidon-media-jsonp'
+	implementation 'io.helidon.config:helidon-config-yaml'
+	implementation 'io.helidon.health:helidon-health'
+	implementation 'io.helidon.health:helidon-health-checks'
+	implementation 'io.helidon.metrics:helidon-metrics'
+
+	implementation 'org.apache.pinot:pinot-java-client:0.10.0'
+	implementation 'com.google.guava:guava:31.1-jre'
+
+	testImplementation 'org.junit.jupiter:junit-jupiter-api'
+	testImplementation 'io.helidon.webclient:helidon-webclient'
+	testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
+}
+
+shadowJar {
+	archiveBaseName.set('recordsServer')
+}
+
+tasks.withType(JavaCompile) {
+	options.compilerArgs += "--enable-preview"
+}
+tasks.withType(Test) {
+	jvmArgs += "--enable-preview"
+}
+tasks.withType(JavaExec) {
+	jvmArgs += '--enable-preview'
+}
+
+test {
+	useJUnitPlatform()
+}
