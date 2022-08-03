@@ -7,6 +7,12 @@ Accept: application/json
 ### get balances for account 0.0.5
 GET http://localhost:8080/api/v1/balances?account.id=0.0.5
 Accept: application/json
+### get balances for account > 10,000
+GET http://localhost:8080/api/v1/balances?account.id=gt:0.0.10000&limit=100
+Accept: application/json
+### get balances for account > 700,000
+GET http://localhost:8080/api/v1/balances?account.id=gt:0.0.700000&limit=100
+Accept: application/json
 
 ### get blocks default
 GET http://localhost:8080/api/v1/blocks

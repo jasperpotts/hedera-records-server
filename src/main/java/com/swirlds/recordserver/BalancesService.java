@@ -65,19 +65,70 @@ public class BalancesService implements Service {
 
         // build and execute query
         final List<QueryParamUtil.WhereClause> whereClauses = new ArrayList<>();
+        final int limit = parseLimitQueryString(limitParam);
+        System.out.println("limit = " + limit);
+        final QueryParamUtil.WhereClause accountWhereClause = accountIdParam.isPresent() ?
+                QueryParamUtil.parseQueryString(QueryParamUtil.Type._long,"account_id",accountIdParam.get()) : null;
+        System.out.println("accountWhereClause = " + accountWhereClause);
 
-        accountIdParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._long,"account_id",s)));
+        long minAccount, maxAccount;
+        boolean singleAccountMode = false;
+        if (accountIdParam.isPresent()) {
+            if (accountWhereClause.comparator() == QueryParamUtil.Comparator.eq) {
+                whereClauses.add(accountWhereClause);
+                singleAccountMode = true;
+            } else if (accountWhereClause.comparator() == QueryParamUtil.Comparator.ne){
+                // TODO, not quite sure what this should do
+                singleAccountMode = true;
+            } else {
+                switch (accountWhereClause.comparator()) {
+                    case lt -> {
+                        maxAccount = Long.parseLong(accountWhereClause.value());
+                        minAccount = maxAccount-limit;
+                    }
+                    case lte -> {
+                        maxAccount = Long.parseLong(accountWhereClause.value())+1;
+                        minAccount = maxAccount-limit;
+                    }
+                    case gt -> {
+                        minAccount = Long.parseLong(accountWhereClause.value());
+                        maxAccount = minAccount+limit;
+                    }
+                    case gte -> {
+                        minAccount = Long.parseLong(accountWhereClause.value())-1;
+                        maxAccount = minAccount+limit;
+                    }
+                    default -> {
+                        minAccount = 0;
+                        maxAccount = minAccount+limit;
+                    }
+                }
+                whereClauses.add(new QueryParamUtil.WhereClause(QueryParamUtil.Type._long,"account_id",
+                        QueryParamUtil.Comparator.gt,Long.toString(minAccount)));
+                whereClauses.add(new QueryParamUtil.WhereClause(QueryParamUtil.Type._long,"account_id",
+                        QueryParamUtil.Comparator.lt,Long.toString(maxAccount)));
+            }
+        } else {
+            minAccount = 0;
+            maxAccount = limit;
+            whereClauses.add(new QueryParamUtil.WhereClause(QueryParamUtil.Type._long,"account_id",
+                    QueryParamUtil.Comparator.gt,Long.toString(minAccount)));
+            whereClauses.add(new QueryParamUtil.WhereClause(QueryParamUtil.Type._long,"account_id",
+                    QueryParamUtil.Comparator.lt,Long.toString(maxAccount)));
+        }
+        for (var where: whereClauses) {
+            System.out.println("        where = " + where);
+        }
 
         accountBalanceQueryParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._long,"balance",s)));
         timestampsParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._long,"consensus_timestamp",s)));
         final String whereClause = whereClauses.isEmpty() ? "" : "where "+QueryParamUtil.whereClausesToQuery(whereClauses);
         final String queryString =
                 "select account_id, token_id, LASTWITHTIME(balance,consensus_timestamp,'long') as balance, max(consensus_timestamp) as consensus_timestamp from balance " +
-                        whereClause+" group by account_id, token_id order by account_id "+QueryParamUtil.Order.parse(orderParam).toString()+" limit ?";
+                        whereClause+" group by account_id, token_id order by account_id "+QueryParamUtil.Order.parse(orderParam).toString();
         System.out.println("queryString = " + queryString);
         final PreparedStatement statement = this.pinotConnection.prepareStatement(new Request("sql",queryString));
         QueryParamUtil.applyWhereClausesToQuery(whereClauses, statement);
-        statement.setInt(whereClauses.size(), parseLimitQueryString(limitParam)); // limit
         final ResultSetGroup pinotResultSetGroup = statement.execute();
         final ResultSet resultTableResultSet = pinotResultSetGroup.getResultSet(0);
 
@@ -94,12 +145,15 @@ public class BalancesService implements Service {
                     .build());
         }
         final JsonObjectBuilder returnObject = JSON.createObjectBuilder()
-                .add("timestamp", (long)resultTableResultSet.getDouble(0,3))
-                .add("balances", balancesArray.build())
-                .add("links", JSON.createObjectBuilder()
-                        .add("next","/api/v1/balances?order=asc&limit=10&account.id=gt:0.0."+highestAccountNumber)
+                .add("timestamp", resultTableResultSet.getRowCount() <= 0 ? 0 : (long)resultTableResultSet.getDouble(0,3))
+                .add("balances", balancesArray.build());
+        if (!singleAccountMode) {
+            returnObject.add("links", JSON.createObjectBuilder()
+                        .add("next",
+                                "/api/v1/balances?order=asc&limit=" + limit + "&account.id=gt:0.0." + highestAccountNumber)
                         .build())
                 ;
+        }
         response.send(returnObject.build());
     }
 }

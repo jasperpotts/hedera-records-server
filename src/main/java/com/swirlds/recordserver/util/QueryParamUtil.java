@@ -45,7 +45,17 @@ public class QueryParamUtil {
 		}
 	}
 	public enum Type {_string, _int, _long, _float, _double }
-	public record WhereClause(Type columnType, String columnName, Comparator comparator, String value){};
+	public record WhereClause(Type columnType, String columnName, Comparator comparator, String value){
+		@Override
+		public String toString() {
+			return "WhereClause{" +
+					"columnType=" + columnType +
+					", columnName='" + columnName + '\'' +
+					", comparator=" + comparator +
+					", value='" + value + '\'' +
+					'}';
+		}
+	};
 
 	public static WhereClause parseQueryString(Type columnType, String columnName, String queryString) {
 		String[] parts = queryString.split(":");
@@ -70,11 +80,13 @@ public class QueryParamUtil {
 
 	public static String whereClausesToQuery(List<WhereClause> whereClauses) {
 		final StringBuilder stringBuilder = new StringBuilder();
-		for(WhereClause clause: whereClauses) {
+		for (int i = 0; i < whereClauses.size(); i++) {
+			WhereClause clause = whereClauses.get(i);
 			stringBuilder.append(clause.columnName);
 			stringBuilder.append(' ');
 			stringBuilder.append(clause.comparator.sql);
 			stringBuilder.append(" ? ");
+			if (i<(whereClauses.size()-1)) stringBuilder.append(" and ");
 		}
 		return  stringBuilder.toString();
 	}
