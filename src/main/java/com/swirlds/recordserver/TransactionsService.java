@@ -55,17 +55,9 @@ public class TransactionsService implements Service {
     }
 
     private void getDefaultMessageHandler(ServerRequest request, ServerResponse response) {
-/*        final Optional<String> accountIdParam = request.queryParams().first("account.id");
-        final Optional<String> timestampsParam = request.queryParams().first("timestamp");
-
-        final Optional<String> transactionTypeQueryParam = request.queryParams().first("transactiontype");
-        final Optional<String> resultParam = request.queryParams().first("result");
-        final Optional<String> typeParam = request.queryParams().first("type");*/
-
-
-
+        final Optional<String> nonceParam = request.queryParams().first("nonce");
+        final Optional<String> scheduledParam = request.queryParams().first("scheduled");
         final Optional<String> transactionIdParam = request.queryParams().first("transactionId");
-        System.out.println("transactionIdParam = " + transactionIdParam.get());
 
         // build and execute query
         final List<QueryParamUtil.WhereClause> whereClauses = new ArrayList<>();
@@ -74,43 +66,47 @@ public class TransactionsService implements Service {
             System.out.println("        where = " + where);
         }
 
-/*        transactionTypeQueryParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"type",s)));
-        resultParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"result",s)));
-        timestampsParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._long,"consensus_timestamp",s)));*/
-
+        nonceParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"nonce",s)));
+        scheduledParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"scheduled",s)));
         transactionIdParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"transaction_id",s)));
+
         final String whereClause = whereClauses.isEmpty() ? "" : "where "+QueryParamUtil.whereClausesToQuery(whereClauses);
-        System.out.println("whereClause = " + whereClause);
         final String queryString =
                 "select * from transaction " +
                         whereClause;
         System.out.println("\nqueryString = " + queryString);
+
         final PreparedStatement statement = this.pinotConnection.prepareStatement(new Request("sql",queryString));
         QueryParamUtil.applyWhereClausesToQuery(whereClauses, statement);
         final ResultSetGroup pinotResultSetGroup = statement.execute();
         final ResultSet resultTableResultSet = pinotResultSetGroup.getResultSet(0);
-        final JsonObject fields = parseFromColumn(resultTableResultSet.getString(0,8));
-        final JsonArray transfers = parseArrayFromColumn(resultTableResultSet.getString(0,15));
-        final JsonObjectBuilder returnObject = JSON.createObjectBuilder()
-                .add("assessed_custom_fees", resultTableResultSet.getString(0,0))
-                .add("consensus_timestamp", resultTableResultSet.getLong(0,1))
-                .add("contract_logs", resultTableResultSet.getString(0,2))
-                .add("contract_results", resultTableResultSet.getString(0,3))
-                .add("contract_state_change", resultTableResultSet.getString(0,4))
-                .add("entityId", resultTableResultSet.getLong(0,7))
-                .add("bytes", fields.getString("transaction_bytes"))
-                .add("charged_tx_fee", fields.getInt("charged_tx_fee"))
-                .add("max_fee", fields.getInt("max_fee"))
-                .add("memo", fields.getString("memo"))
-                .add("valid_duration_seconds", fields.getInt("valid_duration_seconds"))
-                .add("valid_start_ns", fields.getString("valid_start_ns"))
-                .add("parent_consensus_timestamp", fields.getString("parent_consensus_timestamp"))
-                .add("transaction_hash", fields.getString("transaction_hash"))
-                .add("result", resultTableResultSet.getString(0,12))
-                .add("scheduled", resultTableResultSet.getString(0,13))
-                .add("transaction_id", resultTableResultSet.getString(0,14))
-                .add("transfers", transfers);
-        response.send(returnObject.build());
+        if(resultTableResultSet.getRowCount()>0)
+        {
+            final JsonObject fields = parseFromColumn(resultTableResultSet.getString(0, 8));
+            final JsonArray transfers = parseArrayFromColumn(resultTableResultSet.getString(0, 15));
+            final JsonObjectBuilder returnObject = JSON.createObjectBuilder()
+                    .add("assessed_custom_fees", resultTableResultSet.getString(0, 0))
+                    .add("consensus_timestamp", resultTableResultSet.getLong(0, 1))
+                    .add("contract_logs", resultTableResultSet.getString(0, 2))
+                    .add("contract_results", resultTableResultSet.getString(0, 3))
+                    .add("contract_state_change", resultTableResultSet.getString(0, 4))
+                    .add("entityId", resultTableResultSet.getLong(0, 7))
+                    .add("bytes", fields.getString("transaction_bytes"))
+                    .add("charged_tx_fee", fields.getInt("charged_tx_fee"))
+                    .add("max_fee", fields.getInt("max_fee"))
+                    .add("memo", fields.getString("memo"))
+                    .add("valid_duration_seconds", fields.getInt("valid_duration_seconds"))
+                    .add("valid_start_ns", fields.get("valid_start_ns"))
+                    .add("parent_consensus_timestamp", fields.get("parent_consensus_timestamp"))
+                    .add("transaction_hash", fields.getString("transaction_hash"))
+                    .add("result", resultTableResultSet.getString(0, 12))
+                    .add("scheduled", resultTableResultSet.getString(0, 13))
+                    .add("transaction_id", resultTableResultSet.getString(0, 14))
+                    .add("transfers", transfers);
+            response.send(returnObject.build());
+        } else {
+            response.send(Json.createObjectBuilder().build());
+        }
     }
 
 
