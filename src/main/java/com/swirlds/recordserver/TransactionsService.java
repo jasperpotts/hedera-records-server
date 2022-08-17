@@ -68,10 +68,6 @@ public class TransactionsService implements Service {
         // build and execute query
         final List<QueryParamUtil.WhereClause> whereClauses = new ArrayList<>();
 
-        for (var where: whereClauses) {
-            System.out.println("        where = " + where);
-        }
-
         nonceParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"nonce",s)));
         scheduledParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"scheduled",s)));
         transactionIdParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"transaction_id",s)));
