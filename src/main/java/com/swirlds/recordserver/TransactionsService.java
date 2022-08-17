@@ -90,25 +90,7 @@ public class TransactionsService implements Service {
         {
             final JsonObject fields = parseFromColumn(resultTableResultSet.getString(0, 8));
             final JsonArray transfers = parseArrayFromColumn(resultTableResultSet.getString(0, 15));
-            final JsonObjectBuilder returnObject = JSON.createObjectBuilder()
-                    .add("assessed_custom_fees", resultTableResultSet.getString(0, 0))
-                    .add("consensus_timestamp", resultTableResultSet.getLong(0, 1))
-                    .add("contract_logs", resultTableResultSet.getString(0, 2))
-                    .add("contract_results", resultTableResultSet.getString(0, 3))
-                    .add("contract_state_change", resultTableResultSet.getString(0, 4))
-                    .add("entityId", resultTableResultSet.getLong(0, 7))
-                    .add("bytes", fields.getString("transaction_bytes"))
-                    .add("charged_tx_fee", fields.getInt("charged_tx_fee"))
-                    .add("max_fee", fields.getInt("max_fee"))
-                    .add("memo", fields.getString("memo"))
-                    .add("valid_duration_seconds", fields.getInt("valid_duration_seconds"))
-                    .add("valid_start_ns", fields.get("valid_start_ns"))
-                    .add("parent_consensus_timestamp", fields.get("parent_consensus_timestamp"))
-                    .add("transaction_hash", fields.getString("transaction_hash"))
-                    .add("result", resultTableResultSet.getString(0, 12))
-                    .add("scheduled", resultTableResultSet.getString(0, 13))
-                    .add("transaction_id", resultTableResultSet.getString(0, 14))
-                    .add("transfers", transfers);
+            final JsonObjectBuilder returnObject = getTransactionsJsonObjectBuilder(resultTableResultSet, 0, fields, transfers);
             response.send(returnObject.build());
         } else {
             response.send(Json.createObjectBuilder().build());
@@ -144,10 +126,6 @@ public class TransactionsService implements Service {
         transactionTypeParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"type",s)));
         resultParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"result",s)));
 
-        for (var where: whereClauses) {
-            System.out.println("        where = " + where);
-        }
-
         final String whereClause = whereClauses.isEmpty() ? "" : "where "+QueryParamUtil.whereClausesToQuery(whereClauses);
         final String queryString =
                 "select * from transaction " +
@@ -161,34 +139,36 @@ public class TransactionsService implements Service {
             final JsonArrayBuilder transactionsArray = JSON.createArrayBuilder();
             System.out.println("ResultSet count " + resultTableResultSet.getRowCount());
             for (int i = 0; i < resultTableResultSet.getRowCount(); i++) {
-           
                 final JsonObject fields = parseFromColumn(resultTableResultSet.getString(i, 8));
                 final JsonArray transfers = parseArrayFromColumn(resultTableResultSet.getString(i, 15));
-                transactionsArray.add(JSON.createObjectBuilder()
-                        .add("assessed_custom_fees", resultTableResultSet.getString(i, 0))
-                        .add("consensus_timestamp", resultTableResultSet.getLong(i, 1))
-                        .add("contract_logs", resultTableResultSet.getString(i, 2))
-                        .add("contract_results", resultTableResultSet.getString(i, 3))
-                        .add("contract_state_change", resultTableResultSet.getString(i, 4))
-                        .add("entityId", resultTableResultSet.getLong(i, 7))
-                        .add("bytes", fields.getString("transaction_bytes"))
-                        .add("charged_tx_fee", fields.getInt("charged_tx_fee"))
-                        .add("max_fee", fields.getInt("max_fee"))
-                        .add("memo", fields.getString("memo"))
-                        .add("valid_duration_seconds", fields.getInt("valid_duration_seconds"))
-                        .add("valid_start_ns", fields.get("valid_start_ns"))
-                        .add("parent_consensus_timestamp", fields.get("parent_consensus_timestamp"))
-                        .add("transaction_hash", fields.getString("transaction_hash"))
-                        .add("result", resultTableResultSet.getString(i, 12))
-                        .add("scheduled", resultTableResultSet.getString(i, 13))
-                        .add("transaction_id", resultTableResultSet.getString(i, 14))
-                        .add("transfers", transfers)
-                        .build());
+                transactionsArray.add(getTransactionsJsonObjectBuilder(resultTableResultSet, i, fields, transfers).build());
             }
                 final JsonObjectBuilder returnObject = JSON.createObjectBuilder()
                 .add("transactions", transactionsArray.build())
                 .add("links", JSON.createObjectBuilder().add("next","/api/v1/transactions?order=" + orderParam.get() + "&limit=" + limit).build());
         response.send(returnObject.build());
+    }
+
+    private JsonObjectBuilder getTransactionsJsonObjectBuilder(ResultSet resultTableResultSet, int i, JsonObject fields, JsonArray transfers) {
+        return JSON.createObjectBuilder()
+                .add("assessed_custom_fees", resultTableResultSet.getString(i, 0))
+                .add("consensus_timestamp", resultTableResultSet.getLong(i, 1))
+                .add("contract_logs", resultTableResultSet.getString(i, 2))
+                .add("contract_results", resultTableResultSet.getString(i, 3))
+                .add("contract_state_change", resultTableResultSet.getString(i, 4))
+                .add("entityId", resultTableResultSet.getLong(i, 7))
+                .add("bytes", fields.getString("transaction_bytes"))
+                .add("charged_tx_fee", fields.getInt("charged_tx_fee"))
+                .add("max_fee", fields.getInt("max_fee"))
+                .add("memo", fields.getString("memo"))
+                .add("valid_duration_seconds", fields.getInt("valid_duration_seconds"))
+                .add("valid_start_ns", fields.get("valid_start_ns"))
+                .add("parent_consensus_timestamp", fields.get("parent_consensus_timestamp"))
+                .add("transaction_hash", fields.getString("transaction_hash"))
+                .add("result", resultTableResultSet.getString(i, 12))
+                .add("scheduled", resultTableResultSet.getString(i, 13))
+                .add("transaction_id", resultTableResultSet.getString(i, 14))
+                .add("transfers", transfers);
     }
 
     private QueryParamUtil.WhereClause checkCreditDebitType(Optional<String> typeParam, Optional<String> accountIdParam) {
