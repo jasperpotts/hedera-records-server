@@ -1,4 +1,4 @@
-#### BALANCES
+### BALANCES
 ### get balances default
 GET http://localhost:8080/api/v1/balances
 Accept: application/json
@@ -15,7 +15,7 @@ Accept: application/json
 GET http://localhost:8080/api/v1/balances?account.id=gt:0.0.700000&limit=100
 Accept: application/json
 
-#### BLOCKS
+### BLOCKS
 ### get blocks default
 GET http://localhost:8080/api/v1/blocks
 Accept: application/json
@@ -32,7 +32,7 @@ Accept: application/json
 GET http://localhost:8080/api/v1/blocks?order=desc&limit=5
 Accept: application/json
 
-#### TRANSACTIONS
+### TRANSACTIONS
 ### get transactions by Id
 GET http://localhost:8080/api/v1/transactions?transactionId=0.0.89748-1612413398-472232185
 Accept: application/json
