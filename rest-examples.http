@@ -36,3 +36,12 @@ Accept: application/json
 ### get transactions by Id filter by nonce and scheduled
 GET http://localhost:8080/api/v1/transactions?transactionId=0.0.89748-1612413398-472232185&nonce=0&scheduled=false
 Accept: application/json
+### get transactions by accountId
+GET http://localhost:8080/api/v1/transactions?account.id=100&limit=2&order=asc&transactiontype=CRYPTOTRANSFER
+Accept: application/json
+### get transactions by CREDIT type
+GET http://localhost:8080/api/v1/transactions?account.id=98&limit=200&order=asc&type=CREDIT
+Accept: application/json
+### get transactions by DEBIT type
+GET http://localhost:8080/api/v1/transactions?account.id=100&limit=2&order=asc&type=DEBIT
+Accept: application/json
