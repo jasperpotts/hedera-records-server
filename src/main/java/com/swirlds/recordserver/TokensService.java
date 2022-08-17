@@ -67,7 +67,7 @@ public class TokensService implements Service {
         final List<QueryParamUtil.WhereClause> whereClauses = new ArrayList<>();
         // always restrict query (over all entities) to only return tokens
         whereClauses.add(new QueryParamUtil.WhereClause(QueryParamUtil.Type._string, "type",
-                QueryParamUtil.Comparator.eq, "'TOKEN'"));
+                QueryParamUtil.Comparator.eq, "TOKEN"));
         publicKeyQueryParam.ifPresent(s ->
                 whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string, "public_key", s)));
         tokenIdQueryParam.ifPresent(s ->
@@ -89,6 +89,7 @@ public class TokensService implements Service {
         final String queryString =
                 "select consensus_timestamp, entity_number, evm_address, alias, public_key_type, public_key, fields " +
                 "from entity " + whereClause + " order by consensus_timestamp " + direction + " limit ?";
+        System.out.println("queryString = " + queryString);
         final PreparedStatement statement = this.pinotConnection.prepareStatement(new Request("sql",queryString));
         QueryParamUtil.applyWhereClausesToQuery(whereClauses, statement);
         statement.setInt(whereClauses.size(), limit);
@@ -96,7 +97,7 @@ public class TokensService implements Service {
         final ResultSet resultTableResultSet = pinotResultSetGroup.getResultSet(0);
 
         // format results to JSON
-        long latestConsensusTime = 0;
+        long latestConsensusTime = (direction.equalsIgnoreCase("asc") ? 0 : Long.MAX_VALUE);
         final JsonArrayBuilder tokensArray = JSON.createArrayBuilder();
         for (int i = 0; i < resultTableResultSet.getRowCount(); i++) {
             final long consensusTime = resultTableResultSet.getLong(i, 0);
@@ -108,9 +109,30 @@ public class TokensService implements Service {
                     .add("consensus_timestamp", consensusTime)
                     .add("entity_number", resultTableResultSet.getLong(i, 1))
                     .add("evm_address", resultTableResultSet.getString(i, 2))
-                    .add("fields", fields)
                     .add("public_key", resultTableResultSet.getString(i, 5))
                     .add("public_key_type", resultTableResultSet.getString(i, 4))
+                    .add("realm", fields.getString("realm", ""))
+                    .add("shard", fields.getString("shard", ""))
+                    .add("name", fields.getString("name", ""))
+                    .add("symbol", fields.getString("symbol", ""))
+                    .add("decimals", fields.getString("decimals", ""))
+                    .add("initialSupply", fields.getString("initialSupply", ""))
+                    .add("treasury", fields.getString("treasury", ""))
+                    .add("adminKey", fields.getString("adminKey", ""))
+                    .add("kycKey", fields.getString("kycKey", ""))
+                    .add("freezeKey", fields.getString("freezeKey", ""))
+                    .add("wipeKey", fields.getString("wipeKey", ""))
+                    .add("supplyKey", fields.getString("supplyKey", ""))
+                    .add("pauseKey", fields.getString("pauseKey", ""))
+                    .add("freezeDefault", fields.getString("freezeDefault", ""))
+                    .add("expiry", fields.getString("expiry", ""))
+                    .add("autoRenewAccount", fields.getString("autoRenewAccount", ""))
+                    .add("autoRenewPeriod", fields.getString("autoRenewPeriod", ""))
+                    .add("memo", fields.getString("memo", ""))
+                    .add("tokenType", fields.getString("tokenType", ""))
+                    .add("supplyType", fields.getString("supplyType", ""))
+                    .add("maxSupply", fields.getString("maxSupply", ""))
+                    .add("feeScheduleKey", fields.getString("feeScheduleKey", ""))
                     .build());
         }
         final JsonObjectBuilder returnObject = JSON.createObjectBuilder()
