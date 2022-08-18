@@ -1,6 +1,7 @@
 package com.swirlds.recordserver.util;
 
 import jakarta.json.Json;
+import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
 import jakarta.json.stream.JsonParser;
 
@@ -41,6 +42,19 @@ public class Utils {
 		}
 		return Json.createObjectBuilder().build();
 	}
+
+	public static JsonArray parseArrayFromColumn(String columnContent) {
+		if (columnContent != null && !columnContent.isEmpty()) {
+			try (final JsonParser parser = Json.createParser(new StringReader(columnContent))) {
+				if (parser.hasNext()) {
+					parser.next();
+					return parser.getArray();
+				}
+			}
+		}
+		return Json.createArrayBuilder().build();
+	}
+
 
 	public static void failWithError(Throwable e) {
 		e.printStackTrace();
