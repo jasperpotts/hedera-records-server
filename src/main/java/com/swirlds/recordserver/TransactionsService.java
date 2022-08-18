@@ -145,7 +145,7 @@ public class TransactionsService implements Service {
         response.send(returnObject.build());
     }
 
-    private JsonObjectBuilder getTransactionsJsonObjectBuilder(ResultSet resultTableResultSet, int i, JsonObject fields, JsonArray transfers) {
+    public static JsonObjectBuilder getTransactionsJsonObjectBuilder(ResultSet resultTableResultSet, int i, JsonObject fields, JsonArray transfers) {
         return JSON.createObjectBuilder()
                 .add("assessed_custom_fees", resultTableResultSet.getString(i, 0))
                 .add("consensus_timestamp", resultTableResultSet.getLong(i, 1))
