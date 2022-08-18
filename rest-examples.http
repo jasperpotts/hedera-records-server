@@ -70,7 +70,7 @@ Accept: application/json
 GET http://localhost:8080/api/v1/transactions?transactionId=0.0.89748-1612413398-472232185&nonce=0&scheduled=false
 Accept: application/json
 ### get transactions by accountId
-GET http://localhost:8080/api/v1/transactions?account.id=100&limit=2&order=asc&transactiontype=CRYPTOTRANSFER
+GET http://localhost:8080/api/v1/transactions?account.id=969040&limit=10&order=asc&transactiontype=CRYPTOTRANSFER
 Accept: application/json
 ### get transactions by CREDIT type
 GET http://localhost:8080/api/v1/transactions?account.id=98&limit=200&order=asc&type=CREDIT
@@ -78,3 +78,13 @@ Accept: application/json
 ### get transactions by DEBIT type
 GET http://localhost:8080/api/v1/transactions?account.id=100&limit=2&order=asc&type=DEBIT
 Accept: application/json
+
+
+### ACCOUNTS
+### get accounts by Id
+GET http://localhost:8080/api/v1/accounts?idOrAliasOrEvmAddress=969040
+Accept: application/json
+### get accounts by Id and transaction type
+GET http://localhost:8080/api/v1/accounts?idOrAliasOrEvmAddress=969040&transactiontype=CRYPTOTRANSFER
+Accept: application/json
+
