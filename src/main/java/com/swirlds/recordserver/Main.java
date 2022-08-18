@@ -39,6 +39,7 @@ public final class Main {
                                 .build()) // Health at "/health"
                         .register("/api/v1/balances", new BalancesService(config))
                         .register("/api/v1/blocks", new BlocksService(config))
+                        .register("/api/v1/tokens", new TokensService(config))
                         .register("/api/v1/transactions", new TransactionsService(config))
                         .build())
                 .config(config.get("server"))

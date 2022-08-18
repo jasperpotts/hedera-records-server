@@ -32,6 +32,36 @@ Accept: application/json
 GET http://localhost:8080/api/v1/blocks?order=desc&limit=5
 Accept: application/json
 
+### get tokens default
+GET http://localhost:8080/api/v1/tokens
+Accept: application/json
+### get token public key 9e3359cb5a484e7dd942559b50fda3da70cda4935e7e12cfd56d5dc5c67f96d7
+GET http://localhost:8080/api/v1/tokens?publickey=9e3359cb5a484e7dd942559b50fda3da70cda4935e7e12cfd56d5dc5c67f96d7
+Accept: application/json
+### get token entity 969798
+GET http://localhost:8080/api/v1/tokens?token.id=125
+Accept: application/json
+### get token > 1000
+GET http://localhost:8080/api/v1/tokens?token.id=gt:1000
+### get only fungible tokens
+GET http://localhost:8080/api/v1/tokens?type=FUNGIBLE_COMMON
+Accept: application/json
+### get only non-fungible tokens
+GET http://localhost:8080/api/v1/tokens?type=NON_FUNGIBLE_UNIQUE
+Accept: application/json
+### get all types of tokens
+GET http://localhost:8080/api/v1/tokens?type=ALL
+Accept: application/json
+### get tokens from (autoRenew) Account id 950
+GET http://localhost:8080/api/v1/tokens?account.id=950
+Accept: application/json
+### get tokens desc order
+GET http://localhost:8080/api/v1/tokens?order=desc
+Accept: application/json
+### get tokens desc order limit 5
+GET http://localhost:8080/api/v1/tokens?order=desc&limit=5
+Accept: application/json
+
 ### TRANSACTIONS
 ### get transactions by Id
 GET http://localhost:8080/api/v1/transactions?transactionId=0.0.89748-1612413398-472232185
