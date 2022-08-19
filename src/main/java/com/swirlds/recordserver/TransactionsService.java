@@ -52,25 +52,21 @@ public class TransactionsService implements Service {
 
     @Override
     public void update(Routing.Rules rules) {
-        rules.get("/", this::getTransactionIdMessageHandler);
+        rules.get("/", this::getTransactionsMessageHandler);
+        rules.get("/{transactionId}", this::getTransactionIdMessageHandler);
+
     }
 
     private void getTransactionIdMessageHandler(ServerRequest request, ServerResponse response) {
-        System.out.println("The request path is " + request.queryParams());
-        if(!request.queryParams().toMap().containsKey("transactionId")) {
-             getTransactionsMessageHandler(request, response);
-             return;
-        }
         final Optional<String> nonceParam = request.queryParams().first("nonce");
         final Optional<String> scheduledParam = request.queryParams().first("scheduled");
-        final Optional<String> transactionIdParam = request.queryParams().first("transactionId");
-
+        final String transactionIdParam = request.path().param("transactionId");
         // build and execute query
         final List<QueryParamUtil.WhereClause> whereClauses = new ArrayList<>();
 
         nonceParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"nonce",s)));
         scheduledParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"scheduled",s)));
-        transactionIdParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"transaction_id",s)));
+        whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"transaction_id",transactionIdParam));
 
         final String whereClause = whereClauses.isEmpty() ? "" : "where "+QueryParamUtil.whereClausesToQuery(whereClauses);
         final String queryString =

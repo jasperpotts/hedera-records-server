@@ -64,10 +64,10 @@ Accept: application/json
 
 ### TRANSACTIONS
 ### get transactions by Id
-GET http://localhost:8080/api/v1/transactions?transactionId=0.0.89748-1612413398-472232185
+GET http://localhost:8080/api/v1/transactions/0.0.89748-1612413398-472232185
 Accept: application/json
 ### get transactions by Id filter by nonce and scheduled
-GET http://localhost:8080/api/v1/transactions?transactionId=0.0.89748-1612413398-472232185&nonce=0&scheduled=false
+GET http://localhost:8080/api/v1/transactions/0.0.89748-1612413398-472232185?nonce=0&scheduled=false
 Accept: application/json
 ### get transactions by accountId
 GET http://localhost:8080/api/v1/transactions?account.id=969040&limit=10&order=asc&transactiontype=CRYPTOTRANSFER
