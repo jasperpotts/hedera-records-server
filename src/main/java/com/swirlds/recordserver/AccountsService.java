@@ -12,6 +12,7 @@ import org.apache.pinot.client.*;
 import org.eclipse.microprofile.metrics.Counter;
 import org.eclipse.microprofile.metrics.MetricRegistry;
 
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -42,30 +43,37 @@ public class AccountsService implements Service {
 
     @Override
     public void update(Routing.Rules rules) {
-        rules.get("/", this::getDefaultMessageHandler);
+        //rules.get("/", this::getDefaultMessageHandler);
+        rules.get("/{idOrAliasOrEvmAddress}", this::getAccountsMessageHandler);
     }
 
-    private void getDefaultMessageHandler(ServerRequest request, ServerResponse response) {
+    private void getAccountsMessageHandler(ServerRequest request, ServerResponse response) {
 
-        final Optional<String> idParam = request.queryParams().first("idOrAliasOrEvmAddress");
+        final String idParam = request.path().param("idOrAliasOrEvmAddress");
         final Optional<String> transactionTypeParam = request.queryParams().first("type");
+        JsonObjectBuilder accountBuilder =  getAccountsJsonFields(idParam);
+        if(accountBuilder == null) {
+            response.send(JSON.createObjectBuilder().build());
+            return;
+        }
+        //Read Id from account
+        String accountId = String.valueOf(accountBuilder.build().get("account"));
+        if(!accountId.isBlank()) {
+            var ids = accountId.split(".");
+            accountId = ids.length>1?ids[2]:accountId;
+        }
+        final String id = accountId;
 
-        CompletableFuture<JsonObjectBuilder> future1
-                = CompletableFuture.supplyAsync(() -> getAccountsJsonFields(idParam));
+
         CompletableFuture<JsonObjectBuilder> future2
-                = CompletableFuture.supplyAsync(() -> getTransactionsJsonFields(transactionTypeParam, idParam));
+                = CompletableFuture.supplyAsync(() -> getTransactionsJsonFields(transactionTypeParam, id));
         CompletableFuture<JsonObjectBuilder> future3
-                = CompletableFuture.supplyAsync(() -> getBalanceJsonFields(idParam));
+                = CompletableFuture.supplyAsync(() -> getBalanceJsonFields(id));
 
-        // Account/Entity where clauses
-       /* final JsonObjectBuilder accountsReturnObject = getAccountsJsonFields(idParam);
-        final JsonObjectBuilder transactionsReturnObject = getTransactionsJsonFields(transactionTypeParam);
-        final JsonObjectBuilder balanceReturnObject = getBalanceJsonFields(idParam);
-      */
         final JsonObjectBuilder returnObject;
         try {
             returnObject = JSON.createObjectBuilder()
-                      .addAll(future1.get())
+                      .addAll(accountBuilder)
                       .addAll(future2.get())
                       .add("balance",future3.get());
         } catch (InterruptedException e) {
@@ -76,9 +84,13 @@ public class AccountsService implements Service {
         response.send(returnObject.build());
     }
 
-    private JsonObjectBuilder getBalanceJsonFields(Optional<String> idParam) {
+    private JsonObjectBuilder getBalanceJsonFields(String idParam) {
         final List<QueryParamUtil.WhereClause> whereClauses = new ArrayList<>();
-        idParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._long,"account_id",s)));
+        if(!idParam.isBlank()){
+            whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._long,"account_id",idParam));
+        } else {
+            return JSON.createObjectBuilder().add("error","Id field is empty - balance");
+        }
         final String whereClause = whereClauses.isEmpty() ? "" : "where "+QueryParamUtil.whereClausesToQuery(whereClauses);
         final String queryString =
                 "select LASTWITHTIME(balance,consensus_timestamp,'long') as balance, max(consensus_timestamp) as consensus_timestamp from balance " +
@@ -86,32 +98,55 @@ public class AccountsService implements Service {
         final PreparedStatement statement = this.pinotConnection.prepareStatement(new Request("sql",queryString));
         QueryParamUtil.applyWhereClausesToQuery(whereClauses, statement);
         final ResultSetGroup pinotResultSetGroup = statement.execute();
-        final ResultSet resultTableResultSet = pinotResultSetGroup.getResultSet(0);
+        final ResultSet resultTableSet = pinotResultSetGroup.getResultSet(0);
+        if(resultTableSet.getRowCount()==0) {
+            return JSON.createObjectBuilder();
+        }
         final JsonObjectBuilder returnObject =  JSON.createObjectBuilder()
-                                                .add("timestamp",resultTableResultSet.getDouble(0,1))
-                                                .add("balance",resultTableResultSet.getLong(0,0))
+                                                .add("timestamp",resultTableSet.getDouble(0,1))
+                                                .add("balance",resultTableSet.getLong(0,0))
                                                 .add("tokens",JSON.createArrayBuilder().build());
         return returnObject;
     }
 
-    private JsonObjectBuilder getTransactionsJsonFields(Optional<String> transactionTypeParam, Optional<String> idParam) {
+    private JsonObjectBuilder getTransactionsJsonFields(Optional<String> transactionTypeParam, String idParam) {
         final List<QueryParamUtil.WhereClause> whereClauses = new ArrayList<>();
         transactionTypeParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"type",s)));
-        final ResultSet resultTableResultSet = getResultSet(idParam, whereClauses, "ids","transaction");
+        final ResultSet resultTableSet = getResultSet(idParam, whereClauses, "ids","transaction", QueryParamUtil.Type._long);
+        if(resultTableSet.getRowCount()==0) {
+            return JSON.createObjectBuilder();
+        }
         final JsonArrayBuilder transactionsArray = JSON.createArrayBuilder();
-        for (int i = 0; i < resultTableResultSet.getRowCount(); i++) {
-            final JsonObject fields = parseFromColumn(resultTableResultSet.getString(i, 8));
-            final JsonArray transfers = parseArrayFromColumn(resultTableResultSet.getString(i, 15));
-            transactionsArray.add(TransactionsService.getTransactionsJsonObjectBuilder(resultTableResultSet, i, fields, transfers).build());
+        for (int i = 0; i < resultTableSet.getRowCount(); i++) {
+            final JsonObject fields = parseFromColumn(resultTableSet.getString(i, 8));
+            final JsonArray transfers = parseArrayFromColumn(resultTableSet.getString(i, 15));
+            transactionsArray.add(TransactionsService.getTransactionsJsonObjectBuilder(resultTableSet, i, fields, transfers).build());
         }
         final JsonObjectBuilder returnObject = JSON.createObjectBuilder()
                 .add("transactions", transactionsArray.build());
         return returnObject;
     }
 
-    private JsonObjectBuilder getAccountsJsonFields(Optional<String> idParam) {
+    private JsonObjectBuilder getAccountsJsonFields(String idParam) {
         final List<QueryParamUtil.WhereClause> whereClauses = new ArrayList<>();
-        final ResultSet resultTableSet = getResultSet(idParam, whereClauses, "entity_number", "entity");
+        String columnName = "";
+        QueryParamUtil.Type type = QueryParamUtil.Type._string;
+        if(!idParam.isBlank()){
+            if(idParam.matches("0.0.\\d+|\\d+")) {
+                columnName = "entity_number";
+                type = QueryParamUtil.Type._long;
+            }
+            else if(idParam.matches("0x[abcdef0-9]+"))
+                columnName = "evm_address";
+            else if(idParam.matches("[A-Za-z0-9]+"))
+                columnName = "alias";
+        } else {
+            return JSON.createObjectBuilder().add("error","Id field is empty");
+        }
+        final ResultSet resultTableSet = getResultSet(idParam, whereClauses, columnName, "entity", type);
+        if(resultTableSet.getRowCount()==0) {
+            return null;
+        }
         int i=0;// rowIndex
         final JsonObject fields = parseFromColumn(resultTableSet.getString(i, 4));
         final JsonObjectBuilder returnObject =  JSON.createObjectBuilder()
@@ -135,8 +170,8 @@ public class AccountsService implements Service {
         return returnObject;
     }
 
-    private ResultSet getResultSet(Optional<String> param, List<QueryParamUtil.WhereClause> whereClauses, String column_name, String tableName) {
-        param.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._long,column_name,s)));
+    private ResultSet getResultSet(String param, List<QueryParamUtil.WhereClause> whereClauses, String column_name, String tableName, QueryParamUtil.Type paramType) {
+        whereClauses.add(QueryParamUtil.parseQueryString(paramType,column_name,param));
         final String whereClause = whereClauses.isEmpty() ? "" : "where "+QueryParamUtil.whereClausesToQuery(whereClauses);
         final String queryString =
                 "select * from " + tableName + " "+
