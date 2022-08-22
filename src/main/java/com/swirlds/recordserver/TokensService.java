@@ -11,7 +11,6 @@ import io.helidon.webserver.Service;
 import jakarta.json.Json;
 import jakarta.json.JsonArrayBuilder;
 import jakarta.json.JsonBuilderFactory;
-import jakarta.json.JsonNumber;
 import jakarta.json.JsonObject;
 import jakarta.json.JsonObjectBuilder;
 import org.apache.pinot.client.Connection;
@@ -30,6 +29,8 @@ import java.util.Optional;
 import java.util.logging.Logger;
 
 import static com.swirlds.recordserver.util.QueryParamUtil.parseLimitQueryString;
+import static com.swirlds.recordserver.util.Utils.addIfKeyNotNull;
+import static com.swirlds.recordserver.util.Utils.addIfNotNull;
 import static com.swirlds.recordserver.util.Utils.parseFromColumn;
 
 /**
@@ -92,7 +93,7 @@ public class TokensService implements Service {
         final String queryString =
                 "select consensus_timestamp, entity_number, evm_address, alias, public_key_type, public_key, fields " +
                 "from entity " + whereClause + " order by consensus_timestamp " + direction + " limit ?";
-        System.out.println("queryString = " + queryString);
+        System.out.println("listTokens(): queryString = " + queryString);
         final PreparedStatement statement = this.pinotConnection.prepareStatement(new Request("sql", queryString));
         QueryParamUtil.applyWhereClausesToQuery(whereClauses, statement);
         statement.setInt(whereClauses.size(), limit);
@@ -107,36 +108,36 @@ public class TokensService implements Service {
             latestConsensusTime = (direction.equalsIgnoreCase("asc") ? Math.max(latestConsensusTime, consensusTime) :
                     Math.min(latestConsensusTime, consensusTime));
             final JsonObject fields = parseFromColumn(resultTableResultSet.getString(i, 6));
-            tokensArray.add(JSON.createObjectBuilder()
-                    .add("alias", resultTableResultSet.getString(i, 3))
-                    .add("consensus_timestamp", consensusTime)
-                    .add("entity_number", resultTableResultSet.getLong(i, 1))
-                    .add("evm_address", resultTableResultSet.getString(i, 2))
-                    .add("public_key", resultTableResultSet.getString(i, 5))
-                    .add("public_key_type", resultTableResultSet.getString(i, 4))
-                    .add("realm", fields.getString("realm", ""))
-                    .add("shard", fields.getString("shard", ""))
-                    .add("name", fields.getString("name", ""))
-                    .add("symbol", fields.getString("symbol", ""))
-                    .add("decimals", fields.getString("decimals", ""))
-                    .add("initialSupply", fields.getString("initialSupply", ""))
-                    .add("treasury", fields.getString("treasury", ""))
-                    .add("adminKey", fields.getString("adminKey", ""))
-                    .add("kycKey", fields.getString("kycKey", ""))
-                    .add("freezeKey", fields.getString("freezeKey", ""))
-                    .add("wipeKey", fields.getString("wipeKey", ""))
-                    .add("supplyKey", fields.getString("supplyKey", ""))
-                    .add("pauseKey", fields.getString("pauseKey", ""))
-                    .add("freezeDefault", fields.getString("freezeDefault", ""))
-                    .add("expiry", fields.getString("expiry", ""))
-                    .add("autoRenewAccount", fields.getString("autoRenewAccount", ""))
-                    .add("autoRenewPeriod", fields.getString("autoRenewPeriod", ""))
-                    .add("memo", fields.getString("memo", ""))
-                    .add("tokenType", fields.getString("tokenType", ""))
-                    .add("supplyType", fields.getString("supplyType", ""))
-                    .add("maxSupply", fields.getString("maxSupply", ""))
-                    .add("feeScheduleKey", fields.getString("feeScheduleKey", ""))
-                    .build());
+            JsonObjectBuilder singleObject = JSON.createObjectBuilder();
+            addIfKeyNotNull(singleObject, "admin_key", fields, "adminKey");
+            addIfNotNull(singleObject, "alias", resultTableResultSet.getString(i, 3));
+            addIfNotNull(singleObject, "auto_renew_account", fields.getString("autoRenewAccount", null));
+            addIfNotNull(singleObject, "auto_renew_period", fields.getString("autoRenewPeriod", null));
+            singleObject.add("consensus_timestamp", consensusTime);
+            addIfNotNull(singleObject, "decimals", fields.getString("decimals", null));
+            singleObject.add("entity_number", resultTableResultSet.getLong(i, 1));
+            addIfNotNull(singleObject, "evm_address", resultTableResultSet.getString(i, 2));
+            addIfNotNull(singleObject, "expiry", fields.getString("expiry", null));
+            addIfKeyNotNull(singleObject, "fee_schedule_key", fields, "feeScheduleKey");
+            addIfNotNull(singleObject, "freeze_default", fields.getString("freezeDefault", null));
+            addIfKeyNotNull(singleObject, "freeze_key", fields, "freezeKey");
+            addIfNotNull(singleObject, "initial_supply", fields.getString("initialSupply", null));
+            addIfKeyNotNull(singleObject, "kyc_key", fields, "kycKey");
+            addIfNotNull(singleObject, "max_supply", fields.getString("maxSupply", null));
+            addIfNotNull(singleObject, "memo", fields.getString("memo", null));
+            addIfNotNull(singleObject, "name", fields.getString("name", null));
+            addIfKeyNotNull(singleObject, "pause_key", fields, "pauseKey");
+            addIfNotNull(singleObject, "public_key", resultTableResultSet.getString(i, 5));
+            addIfNotNull(singleObject, "public_key_type", resultTableResultSet.getString(i, 4));
+            addIfNotNull(singleObject, "realm", fields.getString("realm", null));
+            addIfNotNull(singleObject, "shard", fields.getString("shard", null));
+            addIfKeyNotNull(singleObject, "supply_key", fields, "supplyKey");
+            addIfNotNull(singleObject, "supply_type", fields.getString("supplyType", null));
+            addIfNotNull(singleObject, "symbol", fields.getString("symbol", null));
+            addIfNotNull(singleObject, "token_type", fields.getString("tokenType", null));
+            addIfNotNull(singleObject, "treasury", fields.getString("treasury", null));
+            addIfKeyNotNull(singleObject, "wipe_key", fields, "wipeKey");
+            tokensArray.add(singleObject.build());
         }
         final JsonObjectBuilder returnObject = JSON.createObjectBuilder()
                 .add("tokens", tokensArray.build())
@@ -148,14 +149,14 @@ public class TokensService implements Service {
     }
 
 /**********************
-### getTokenById not specifiying a timestamp
+### getTokenById not specifying a timestamp
 GET http://localhost:8080/api/v1/tokens/107594
-### getTokenById specifiying a timestamp
+### getTokenById specifying a timestamp
 GET http://localhost:8080/api/v1/tokens/107594?timestamp=1610640452612903002
-### getTokenById specifiying an earlier timestamp
+### getTokenById specifying an earlier timestamp
 GET http://localhost:8080/api/v1/tokens/107594?timestamp=1610640421985772001
-### getTokenById specifiying an earlier timestamp than the passed-in one
-GET http://localhost:8080/api/v1/tokens/107594?timestamp=lt:1610640421985772001
+### getTokenById specifying an earlier timestamp than the passed-in one
+GET http://localhost:8080/api/v1/tokens/107594?timestamp=lt:1610640452612903002
 **********************/
     private void getTokenById(ServerRequest request, ServerResponse response) {
         System.out.println("Calling into getTokenById!");
@@ -167,6 +168,9 @@ GET http://localhost:8080/api/v1/tokens/107594?timestamp=lt:1610640421985772001
         // always restrict query (over all entities) to only return tokens
         whereClauses.add(new QueryParamUtil.WhereClause(QueryParamUtil.Type._string, "type",
                 QueryParamUtil.Comparator.eq, "TOKEN"));
+        // restrict query to only the tokenId passed in as a path parameter
+        whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._long, "entity_number",
+                request.path().segments().get(0)));
         timestampQueryParam.ifPresent(s -> whereClauses.add(
                 QueryParamUtil.parseQueryString(QueryParamUtil.Type._long, "consensus_timestamp", s)));
 
@@ -176,7 +180,7 @@ GET http://localhost:8080/api/v1/tokens/107594?timestamp=lt:1610640421985772001
         final String queryString =
                 "select consensus_timestamp, entity_number, evm_address, alias, public_key_type, public_key, fields " +
                 "from entity " + whereClause + " order by consensus_timestamp desc limit ?";
-        System.out.println("queryString = " + queryString);
+        System.out.println("getTokenById(): queryString = " + queryString);
         final PreparedStatement statement = this.pinotConnection.prepareStatement(new Request("sql", queryString));
         QueryParamUtil.applyWhereClausesToQuery(whereClauses, statement);
         statement.setInt(whereClauses.size(), limit);
@@ -233,34 +237,6 @@ GET http://localhost:8080/api/v1/tokens/107594?timestamp=lt:1610640421985772001
         // no data retained for custom_fees field
 
         response.send(returnObject.build());
-    }
-
-    private void addIfNotNull(JsonObjectBuilder object, String name, String value) {
-        if (value != null) {
-            object.add(name, value);
-        }
-    }
-
-    private void addIfNotNull(JsonObjectBuilder object, String name, JsonNumber value) {
-        if (value != null) {
-            object.add(name, value);
-        }
-    }
-
-    private void addIfNotNull(JsonObjectBuilder object, String name, Boolean value) {
-        if (value != null) {
-            object.add(name, value);
-        }
-    }
-
-    private void addIfKeyNotNull(JsonObjectBuilder object, String name, JsonObject fields, String fieldName) {
-        String value = fields.getString(fieldName, null);
-        if (value != null) {
-            object.add(name, JSON.createObjectBuilder()
-                    .add("_type", "ProtobufEncoded")
-                    .add("key", value)
-                    .build());
-        }
     }
 
 }

@@ -2,7 +2,10 @@ package com.swirlds.recordserver.util;
 
 import jakarta.json.Json;
 import jakarta.json.JsonArray;
+import jakarta.json.JsonBuilderFactory;
+import jakarta.json.JsonNumber;
 import jakarta.json.JsonObject;
+import jakarta.json.JsonObjectBuilder;
 import jakarta.json.stream.JsonParser;
 
 import java.io.IOException;
@@ -20,6 +23,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
+import java.util.Collections;
 
 public class Utils {
 	public static final double TINY_BAR_IN_HBAR = 100_000_000;
@@ -27,6 +31,7 @@ public class Utils {
 	private static final byte[] HEX_ARRAY = "0123456789ABCDEF".getBytes(StandardCharsets.US_ASCII);
 	private static final Base64.Encoder BASE64_ENCODER = Base64.getEncoder();
 	private static final BigInteger SECONDS_TO_NANOSECONDS = BigInteger.valueOf(1_000_000_000L);
+	private static final JsonBuilderFactory JSON = Json.createBuilderFactory(Collections.emptyMap());
 
 	/**
 	 * Extract and parse JSON Object from column content string, returning empty object if the column is null, or empty
@@ -147,6 +152,46 @@ public class Utils {
 	public static String getEpocNanos(long epocSeconds, long nanos) {
 		final String nanosString = Long.toString(nanos);
 		return epocSeconds + "0".repeat(9-nanosString.length()) + nanosString;
+	}
+
+	/**
+	 * Only add the name/value to the JsonObjectBuilder if the value has a non-null String value.
+	 */
+	public static void addIfNotNull(JsonObjectBuilder object, String name, String value) {
+		if (value != null) {
+			object.add(name, value);
+		}
+	}
+
+	/**
+	 * Only add the name/value to the JsonObjectBuilder if the value has a non-null JsonNumber value.
+	 */
+	public static void addIfNotNull(JsonObjectBuilder object, String name, JsonNumber value) {
+		if (value != null) {
+			object.add(name, value);
+		}
+	}
+
+	/**
+	 * Only add the name/value to the JsonObjectBuilder if the value has a non-null Boolean value.
+	 */
+	public static void addIfNotNull(JsonObjectBuilder object, String name, Boolean value) {
+		if (value != null) {
+			object.add(name, value);
+		}
+	}
+
+	/**
+	 * Only add the key-related values to the JsonObjectBuilder if the extracted key has a non-null String value.
+	 */
+	public static void addIfKeyNotNull(JsonObjectBuilder object, String name, JsonObject fields, String fieldName) {
+		String value = fields.getString(fieldName, null);
+		if (value != null) {
+			object.add(name, JSON.createObjectBuilder()
+					.add("_type", "ProtobufEncoded")
+					.add("key", value)
+					.build());
+		}
 	}
 
 	public static byte[] hashShar384(ByteBuffer data) {
