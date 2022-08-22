@@ -7,12 +7,15 @@ import io.helidon.webserver.Routing;
 import io.helidon.webserver.ServerRequest;
 import io.helidon.webserver.ServerResponse;
 import io.helidon.webserver.Service;
-import jakarta.json.*;
+import jakarta.json.JsonObject;
+import jakarta.json.JsonObjectBuilder;
+import jakarta.json.JsonBuilderFactory;
+import jakarta.json.Json;
+import jakarta.json.JsonArrayBuilder;
+import jakarta.json.JsonArray;
 import org.apache.pinot.client.*;
-import org.eclipse.microprofile.metrics.Counter;
 import org.eclipse.microprofile.metrics.MetricRegistry;
 
-import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -61,9 +64,17 @@ public class AccountsService implements Service {
             return;
         }
 
+        JsonObjectBuilder accountBuilder =  getAccountsJsonFields(idParam);
+        if(accountBuilder == null) {
+            response.send(JSON.createObjectBuilder().build());
+            return;
+        }
+
+        final String id = getAccountId(accountBuilder.build());
+
         final List<QueryParamUtil.WhereClause> whereClauses = new ArrayList<>();
         final int limit = parseLimitQueryString(limitParam);
-
+        whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"account_id",id));
         serialNumberParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"serial_number",s)));
         spenderIdParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"spender",s)));
         tokenIdParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"token_id",s)));
@@ -104,6 +115,15 @@ public class AccountsService implements Service {
 
     }
 
+    private String getAccountId(JsonObject account) {
+        String accountId = String.valueOf(account.get("account"));
+        if(!accountId.isBlank()) {
+            var ids = accountId.split(".");
+            accountId = ids.length>1 ? ids[2] : accountId;
+        }
+        return accountId;
+    }
+
     private String getOrderBy(Optional<String> orderParam) {
         String orderBy;
         if(orderParam.isPresent()){
@@ -118,24 +138,18 @@ public class AccountsService implements Service {
         return JSON.createObjectBuilder().add("error", "Id field is empty");
     }
 
-
     private void getAccountsMessageHandler(ServerRequest request, ServerResponse response) {
 
         final String idParam = request.path().param("idOrAliasOrEvmAddress");
         final Optional<String> transactionTypeParam = request.queryParams().first("type");
-        JsonObjectBuilder accountBuilder =  getAccountsJsonFields(idParam);
+        final JsonObjectBuilder accountBuilder =  getAccountsJsonFields(idParam);
         if(accountBuilder == null) {
             response.send(JSON.createObjectBuilder().build());
             return;
         }
-        //Read Id from account
-        String accountId = String.valueOf(accountBuilder.build().get("account"));
-        if(!accountId.isBlank()) {
-            var ids = accountId.split(".");
-            accountId = ids.length>1 ? ids[2] : accountId;
-        }
-        final String id = accountId;
-
+        //Reading the account number from the entity table.
+        JsonObject account = accountBuilder.build();
+        final String id = getAccountId(account);
 
         CompletableFuture<JsonObjectBuilder> future2
                 = CompletableFuture.supplyAsync(() -> getTransactionsJsonFields(transactionTypeParam, id));
@@ -144,8 +158,7 @@ public class AccountsService implements Service {
 
         final JsonObjectBuilder returnObject;
         try {
-            returnObject = JSON.createObjectBuilder()
-                      .addAll(accountBuilder)
+            returnObject = JSON.createObjectBuilder(account)
                       .addAll(future2.get())
                       .add("balance",future3.get());
         } catch (InterruptedException e) {
