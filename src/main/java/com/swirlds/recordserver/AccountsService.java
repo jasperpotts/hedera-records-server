@@ -60,7 +60,7 @@ public class AccountsService implements Service {
         String accountId = String.valueOf(accountBuilder.build().get("account"));
         if(!accountId.isBlank()) {
             var ids = accountId.split(".");
-            accountId = ids.length>1?ids[2]:accountId;
+            accountId = ids.length>1 ? ids[2] : accountId;
         }
         final String id = accountId;
 
