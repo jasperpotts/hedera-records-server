@@ -32,14 +32,15 @@ Accept: application/json
 GET http://localhost:8080/api/v1/blocks?order=desc&limit=5
 Accept: application/json
 
+### TOKENS
 ### get tokens default
 GET http://localhost:8080/api/v1/tokens
 Accept: application/json
 ### get token public key 9e3359cb5a484e7dd942559b50fda3da70cda4935e7e12cfd56d5dc5c67f96d7
 GET http://localhost:8080/api/v1/tokens?publickey=9e3359cb5a484e7dd942559b50fda3da70cda4935e7e12cfd56d5dc5c67f96d7
 Accept: application/json
-### get token entity 969798
-GET http://localhost:8080/api/v1/tokens?token.id=125
+### get token entity 107594 (this returns two elements)
+GET http://localhost:8080/api/v1/tokens?token.id=107594
 Accept: application/json
 ### get token > 1000
 GET http://localhost:8080/api/v1/tokens?token.id=gt:1000
@@ -61,6 +62,15 @@ Accept: application/json
 ### get tokens desc order limit 5
 GET http://localhost:8080/api/v1/tokens?order=desc&limit=5
 Accept: application/json
+###
+### getTokenById not specifiying a timestamp
+GET http://localhost:8080/api/v1/tokens/107594
+### getTokenById specifiying a timestamp
+GET http://localhost:8080/api/v1/tokens/107594?timestamp=1610640452612903002
+### getTokenById specifiying an earlier timestamp
+GET http://localhost:8080/api/v1/tokens/107594?timestamp=1610640421985772001
+### getTokenById specifiying an earlier timestamp than the passed-in one
+GET http://localhost:8080/api/v1/tokens/107594?timestamp=lt:1610640452612903002
 
 ### TRANSACTIONS
 ### get transactions by Id
