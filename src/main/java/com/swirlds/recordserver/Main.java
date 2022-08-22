@@ -41,6 +41,7 @@ public final class Main {
                         .register("/api/v1/blocks", new BlocksService(config))
                         .register("/api/v1/tokens", new TokensService(config))
                         .register("/api/v1/transactions", new TransactionsService(config))
+                        .register("/api/v1/accounts", new AccountsService(config))
                         .build())
                 .config(config.get("server"))
                 .addMediaSupport(JsonpSupport.create())

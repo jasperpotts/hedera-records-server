@@ -52,25 +52,21 @@ public class TransactionsService implements Service {
 
     @Override
     public void update(Routing.Rules rules) {
-        rules.get("/", this::getTransactionIdMessageHandler);
+        rules.get("/", this::getTransactionsMessageHandler);
+        rules.get("/{transactionId}", this::getTransactionIdMessageHandler);
+
     }
 
     private void getTransactionIdMessageHandler(ServerRequest request, ServerResponse response) {
-        System.out.println("The request path is " + request.queryParams());
-        if(!request.queryParams().toMap().containsKey("transactionId")) {
-             getTransactionsMessageHandler(request, response);
-             return;
-        }
         final Optional<String> nonceParam = request.queryParams().first("nonce");
         final Optional<String> scheduledParam = request.queryParams().first("scheduled");
-        final Optional<String> transactionIdParam = request.queryParams().first("transactionId");
-
+        final String transactionIdParam = request.path().param("transactionId");
         // build and execute query
         final List<QueryParamUtil.WhereClause> whereClauses = new ArrayList<>();
 
         nonceParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"nonce",s)));
         scheduledParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"scheduled",s)));
-        transactionIdParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"transaction_id",s)));
+        whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"transaction_id",transactionIdParam));
 
         final String whereClause = whereClauses.isEmpty() ? "" : "where "+QueryParamUtil.whereClausesToQuery(whereClauses);
         final String queryString =
@@ -145,7 +141,7 @@ public class TransactionsService implements Service {
         response.send(returnObject.build());
     }
 
-    private JsonObjectBuilder getTransactionsJsonObjectBuilder(ResultSet resultTableResultSet, int i, JsonObject fields, JsonArray transfers) {
+    public static JsonObjectBuilder getTransactionsJsonObjectBuilder(ResultSet resultTableResultSet, int i, JsonObject fields, JsonArray transfers) {
         return JSON.createObjectBuilder()
                 .add("assessed_custom_fees", resultTableResultSet.getString(i, 0))
                 .add("consensus_timestamp", resultTableResultSet.getLong(i, 1))
@@ -153,14 +149,14 @@ public class TransactionsService implements Service {
                 .add("contract_results", resultTableResultSet.getString(i, 3))
                 .add("contract_state_change", resultTableResultSet.getString(i, 4))
                 .add("entityId", resultTableResultSet.getLong(i, 7))
-                .add("bytes", fields.getString("transaction_bytes"))
-                .add("charged_tx_fee", fields.getInt("charged_tx_fee"))
-                .add("max_fee", fields.getInt("max_fee"))
-                .add("memo", fields.getString("memo"))
-                .add("valid_duration_seconds", fields.getInt("valid_duration_seconds"))
-                .add("valid_start_ns", fields.get("valid_start_ns"))
-                .add("parent_consensus_timestamp", fields.get("parent_consensus_timestamp"))
-                .add("transaction_hash", fields.getString("transaction_hash"))
+                .add("bytes", fields.getString("transaction_bytes",""))
+                .add("charged_tx_fee", fields.getInt("charged_tx_fee",-1))
+                .add("max_fee", fields.getInt("max_fee",-1))
+                .add("memo", fields.getString("memo",""))
+                .add("valid_duration_seconds", fields.getInt("valid_duration_seconds",-1))
+                .add("valid_start_ns", fields.getInt("valid_start_ns",-1))
+                .add("parent_consensus_timestamp", fields.getInt("parent_consensus_timestamp",-1))
+                .add("transaction_hash", fields.getString("transaction_hash",""))
                 .add("result", resultTableResultSet.getString(i, 12))
                 .add("scheduled", resultTableResultSet.getString(i, 13))
                 .add("transaction_id", resultTableResultSet.getString(i, 14))
