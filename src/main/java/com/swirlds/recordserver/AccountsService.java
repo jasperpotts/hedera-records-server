@@ -20,6 +20,7 @@ import java.util.Optional;
 import java.util.concurrent.*;
 import java.util.logging.Logger;
 
+import static com.swirlds.recordserver.util.QueryParamUtil.parseLimitQueryString;
 import static com.swirlds.recordserver.util.Utils.parseArrayFromColumn;
 import static com.swirlds.recordserver.util.Utils.parseFromColumn;
 
@@ -28,7 +29,7 @@ public class AccountsService implements Service {
     private static final Logger LOGGER = Logger.getLogger(AccountsService.class.getName());
     private static final JsonBuilderFactory JSON = Json.createBuilderFactory(Collections.emptyMap());
     private final MetricRegistry registry = RegistryFactory.getInstance().getRegistry(MetricRegistry.Type.APPLICATION);
-    private final Counter accessCtr = registry.counter("accessctr");
+
     private final Connection pinotConnection;
 
     public AccountsService(Config config) {
@@ -43,9 +44,80 @@ public class AccountsService implements Service {
 
     @Override
     public void update(Routing.Rules rules) {
-        //rules.get("/", this::getDefaultMessageHandler);
+        rules.get("/{idOrAliasOrEvmAddress}/nfts", this::getAccountNftsMessageHandler);
         rules.get("/{idOrAliasOrEvmAddress}", this::getAccountsMessageHandler);
     }
+
+    private void getAccountNftsMessageHandler(ServerRequest request, ServerResponse response) {
+        final String idParam = request.path().param("idOrAliasOrEvmAddress");
+        final Optional<String> serialNumberParam = request.queryParams().first("serialnumber");
+        final Optional<String> tokenIdParam = request.queryParams().first("token.id");
+        final Optional<String> spenderIdParam = request.queryParams().first("spender.id");
+        final Optional<String> limitParam = request.queryParams().first("limit");
+        final Optional<String> orderParam = request.queryParams().first("order");
+
+        if(idParam.isBlank()) {
+            response.send(getErrorMessage());
+            return;
+        }
+
+        final List<QueryParamUtil.WhereClause> whereClauses = new ArrayList<>();
+        final int limit = parseLimitQueryString(limitParam);
+
+        serialNumberParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"serial_number",s)));
+        spenderIdParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"spender",s)));
+        tokenIdParam.ifPresent(s -> whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string,"token_id",s)));
+        String orderBy = getOrderBy(orderParam);
+
+        final String whereClause = whereClauses.isEmpty() ? "" : "where "+QueryParamUtil.whereClausesToQuery(whereClauses);
+        final String queryString =
+                "select * from nft " +
+                        whereClause + " order by consensus_timestamp "+orderBy+" limit ?";
+        System.out.println("\nqueryString = " + queryString);
+        final PreparedStatement statement = this.pinotConnection.prepareStatement(new Request("sql",queryString));
+        QueryParamUtil.applyWhereClausesToQuery(whereClauses, statement);
+        statement.setInt(whereClauses.size(), limit);
+        final ResultSetGroup pinotResultSetGroup = statement.execute();
+        final ResultSet resultTableSet = pinotResultSetGroup.getResultSet(0);
+        final JsonArrayBuilder nftArray = JSON.createArrayBuilder();
+
+        if(resultTableSet.getRowCount() == 0) {
+            response.send(JSON.createObjectBuilder().build());
+        }
+        for (int i = 0; i < resultTableSet.getRowCount(); i++) {
+                nftArray.add(JSON.createObjectBuilder()
+                        .add("account_id", resultTableSet.getString(i, 0))
+                        .add("created_timestamp", resultTableSet.getLong(i, 1))
+                        .add("delegating_spender", resultTableSet.getString(i, 2))
+                        .add("deleted", resultTableSet.getString(i, 3))
+                        .add("metadata", resultTableSet.getString(i, 4))
+                        .add("modified_timestamp", resultTableSet.getString(i, 1))
+                        .add("serial_number", resultTableSet.getLong(i, 5))
+                        .add("spender", resultTableSet.getString(i, 6))
+                        .add("token_id", resultTableSet.getString(i, 7)).build());
+        }
+
+        final JsonObjectBuilder returnObject = JSON.createObjectBuilder()
+                .add("nfts", nftArray.build())
+                .add("links", JSON.createObjectBuilder().add("next","/api/v1/accounts/"+idParam+"/nfts?order=" + orderBy + "&limit=" + limit).build());
+        response.send(returnObject.build());
+
+    }
+
+    private String getOrderBy(Optional<String> orderParam) {
+        String orderBy;
+        if(orderParam.isPresent()){
+            orderBy = QueryParamUtil.Order.parse(orderParam).toString();
+        } else {
+            orderBy = QueryParamUtil.ORDER_BY_DESC;
+        }
+        return orderBy;
+    }
+
+    private JsonObjectBuilder getErrorMessage() {
+        return JSON.createObjectBuilder().add("error", "Id field is empty");
+    }
+
 
     private void getAccountsMessageHandler(ServerRequest request, ServerResponse response) {
 
@@ -141,7 +213,7 @@ public class AccountsService implements Service {
             else if(idParam.matches("[A-Za-z0-9]+"))
                 columnName = "alias";
         } else {
-            return JSON.createObjectBuilder().add("error","Id field is empty");
+            return getErrorMessage();
         }
         final ResultSet resultTableSet = getResultSet(idParam, whereClauses, columnName, "entity", type);
         if(resultTableSet.getRowCount()==0) {

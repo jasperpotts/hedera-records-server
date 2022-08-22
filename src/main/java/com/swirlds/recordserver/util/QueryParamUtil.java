@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.Optional;
 
 public class QueryParamUtil {
+
+	public static final String ORDER_BY_DESC = "desc";
+	public static final String ORDER_BY_ASC = "asc";
 	public enum Comparator {
 		eq("="),
 		ne("<>"),
@@ -75,7 +78,7 @@ public class QueryParamUtil {
 				e.printStackTrace();
 			}
 		}
-		return 25;
+		return 2;
 	}
 
 	public static String whereClausesToQuery(List<WhereClause> whereClauses) {
