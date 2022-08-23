@@ -63,14 +63,27 @@ Accept: application/json
 GET http://localhost:8080/api/v1/tokens?order=desc&limit=5
 Accept: application/json
 ###
-### getTokenById not specifiying a timestamp
+### getTokenById not specifying a timestamp
 GET http://localhost:8080/api/v1/tokens/107594
-### getTokenById specifiying a timestamp
+### getTokenById specifying a timestamp
 GET http://localhost:8080/api/v1/tokens/107594?timestamp=1610640452612903002
-### getTokenById specifiying an earlier timestamp
+### getTokenById specifying an earlier timestamp
 GET http://localhost:8080/api/v1/tokens/107594?timestamp=1610640421985772001
-### getTokenById specifiying an earlier timestamp than the passed-in one
+### getTokenById specifying an earlier timestamp than the passed-in one
 GET http://localhost:8080/api/v1/tokens/107594?timestamp=lt:1610640452612903002
+###
+### listTokenBalancesById specifying only a token id
+GET http://localhost:8080/api/v1/tokens/629591/balances?limit=99
+### listTokenBalancesById specifying a token id and an account id
+GET http://localhost:8080/api/v1/tokens/629591/balances?account.id=644972
+### listTokenBalancesById specifying a token id and a range of account ids
+GET http://localhost:8080/api/v1/tokens/629591/balances?account.id=gt:644000&account.id=lt:644999&limit=1000
+### listTokenBalancesById specifying a token id and a range of account ids, sorted in descending order
+GET http://localhost:8080/api/v1/tokens/629591/balances?account.id=gt:644000&account.id=lt:644999&limit=1000&order=desc
+### listTokenBalancesById specifying a token id and an account id and a particular balance amount
+GET http://localhost:8080/api/v1/tokens/629591/balances?account.id=644972&account.balance=500000000
+### listTokenBalancesById specifying a token id and an account id and a particular timestamp -- not yet working
+GET http://localhost:8080/api/v1/tokens/629591/balances?account.id=644972&timestamp=1644887406787336960
 
 ### TRANSACTIONS
 ### get transactions by Id

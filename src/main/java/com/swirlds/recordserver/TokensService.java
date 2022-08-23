@@ -57,6 +57,7 @@ public class TokensService implements Service {
     public void update(Routing.Rules rules) {
         rules.get("/", this::listTokens);
         rules.get("/{tokenId}", this::getTokenById);
+        rules.get("/{tokenId}/balances", this::listTokenBalancesById);
     }
 
     private void listTokens(ServerRequest request, ServerResponse response) {
@@ -236,6 +237,136 @@ GET http://localhost:8080/api/v1/tokens/107594?timestamp=lt:1610640452612903002
         addIfKeyNotNull(returnObject, "wipe_key", fields, "wipeKey");
         // no data retained for custom_fees field
 
+        response.send(returnObject.build());
+    }
+
+/**********************
+### listTokenBalancesById specifying only a token id
+GET http://localhost:8080/api/v1/tokens/629591/balances?limit=99
+### listTokenBalancesById specifying a token id and an account id
+GET http://localhost:8080/api/v1/tokens/629591/balances?account.id=644972
+### listTokenBalancesById specifying a token id and a range of account ids
+GET http://localhost:8080/api/v1/tokens/629591/balances?account.id=gt:644000&account.id=lt:644999&limit=1000
+### listTokenBalancesById specifying a token id and a range of account ids, sorted in descending order
+GET http://localhost:8080/api/v1/tokens/629591/balances?account.id=gt:644000&account.id=lt:644999&limit=1000&order=desc
+### listTokenBalancesById specifying a token id and an account id and a particular balance amount
+GET http://localhost:8080/api/v1/tokens/629591/balances?account.id=644972&account.balance=500000000
+### listTokenBalancesById specifying a token id and an account id and a particular timestamp -- not yet working
+GET http://localhost:8080/api/v1/tokens/629591/balances?account.id=644972&timestamp=1644887406787336960
+ **********************/
+    private void listTokenBalancesById(ServerRequest request, ServerResponse response) {
+        // this routine has much in common with BalanceService.getDefaultMessageHandler(); they should be kept in sync.
+
+        final Optional<String> accountIdQueryParam = request.queryParams().first("account.id");
+        final Optional<String> accountBalanceQueryParam = request.queryParams().first("account.balance");
+        final Optional<String> orderParam = request.queryParams().first("order");
+        final Optional<String> publicKeyQueryParam = request.queryParams().first("account.publickey");
+        final Optional<String> timestampQueryParam = request.queryParams().first("timestamp"); // TODO (MYK): can be a list
+        final Optional<String> limitParam = request.queryParams().first("limit");
+
+        // TODO if publicKeyParam is set then need to query accounts table to get account ID from public key, then look
+
+        // build and execute query
+        final List<QueryParamUtil.WhereClause> whereClauses = new ArrayList<>();
+        final int limit = parseLimitQueryString(limitParam);
+        System.out.println("listTokenBalancesById: limit = " + limit);
+        final QueryParamUtil.WhereClause accountWhereClause = (accountIdQueryParam.isPresent() ?
+                QueryParamUtil.parseQueryString(QueryParamUtil.Type._long, "account_id", accountIdQueryParam.get()) :
+                null);
+        System.out.println("accountWhereClause = " + accountWhereClause);
+        // restrict query to only the tokenId passed in as a path parameter
+        final String tokenId = request.path().segments().get(0);
+        accountBalanceQueryParam.ifPresent(s -> whereClauses.add(
+                QueryParamUtil.parseQueryString(QueryParamUtil.Type._long, "balance", s)));
+        timestampQueryParam.ifPresent(s -> whereClauses.add(
+                QueryParamUtil.parseQueryString(QueryParamUtil.Type._long, "consensus_timestamp", s)));
+
+        long minAccount, maxAccount;
+        boolean singleAccountMode = false;
+        if (accountIdQueryParam.isPresent()) {
+            if (accountWhereClause.comparator() == QueryParamUtil.Comparator.eq) {
+                whereClauses.add(accountWhereClause);
+                singleAccountMode = true;
+            } else if (accountWhereClause.comparator() == QueryParamUtil.Comparator.ne){
+                // TODO, not quite sure what this should do
+                singleAccountMode = false;
+            } else {
+                switch (accountWhereClause.comparator()) {
+                    case lt -> {
+                        maxAccount = Long.parseLong(accountWhereClause.value());
+                        minAccount = maxAccount - limit;
+                    }
+                    case lte -> {
+                        maxAccount = Long.parseLong(accountWhereClause.value()) + 1;
+                        minAccount = maxAccount - limit;
+                    }
+                    case gt -> {
+                        minAccount = Long.parseLong(accountWhereClause.value());
+                        maxAccount = minAccount + limit;
+                    }
+                    case gte -> {
+                        minAccount = Long.parseLong(accountWhereClause.value()) - 1;
+                        maxAccount = minAccount + limit;
+                    }
+                    default -> {
+                        minAccount = 0;
+                        maxAccount = limit;
+                    }
+                }
+                whereClauses.add(new QueryParamUtil.WhereClause(QueryParamUtil.Type._long, "account_id",
+                        QueryParamUtil.Comparator.gt, Long.toString(minAccount)));
+                whereClauses.add(new QueryParamUtil.WhereClause(QueryParamUtil.Type._long, "account_id",
+                        QueryParamUtil.Comparator.lt, Long.toString(maxAccount)));
+            }
+        } else {
+            minAccount = 0;
+            maxAccount = Long.MAX_VALUE;
+            whereClauses.add(new QueryParamUtil.WhereClause(QueryParamUtil.Type._long, "account_id",
+                    QueryParamUtil.Comparator.gt, Long.toString(minAccount)));
+            whereClauses.add(new QueryParamUtil.WhereClause(QueryParamUtil.Type._long, "account_id",
+                    QueryParamUtil.Comparator.lt, Long.toString(maxAccount)));
+        }
+
+        final String direction = QueryParamUtil.Order.parse(orderParam).toString();
+        whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._long, "token_id", tokenId));
+        final String whereClause = "where " + QueryParamUtil.whereClausesToQuery(whereClauses);
+        System.out.println("        whereClause = " + whereClause);
+        final String queryString =
+                "select account_id, token_id, LASTWITHTIME(balance, consensus_timestamp, 'long') as balance, " +
+                        "max(consensus_timestamp) as consensus_timestamp from balance " + whereClause + 
+                        " group by account_id, token_id order by account_id " + direction + " limit ?";
+        System.out.println("queryString = " + queryString);
+        final PreparedStatement statement = this.pinotConnection.prepareStatement(new Request("sql", queryString));
+        QueryParamUtil.applyWhereClausesToQuery(whereClauses, statement);
+        statement.setInt(whereClauses.size(), limit);
+        final ResultSetGroup pinotResultSetGroup = statement.execute();
+        final ResultSet resultTableResultSet = pinotResultSetGroup.getResultSet(0);
+
+        // format results to JSON
+        long highestAccountNumber = (direction.equalsIgnoreCase("asc") ? 0 : Long.MAX_VALUE);
+        final JsonArrayBuilder balancesArray = JSON.createArrayBuilder();
+        for (int i = 0; i < resultTableResultSet.getRowCount(); i++) {
+            final long accountNum = resultTableResultSet.getLong(i, 0);
+            highestAccountNumber = (direction.equalsIgnoreCase("asc") ? Math.max(highestAccountNumber, accountNum) :
+                    Math.min(highestAccountNumber, accountNum));
+            balancesArray.add(JSON.createObjectBuilder()
+                    .add("account", "0.0." + accountNum)
+                    .add("balance", resultTableResultSet.getLong(i, 2))
+                    .add("tokens",JSON.createArrayBuilder().build())
+                    .build());
+        }
+
+        final JsonObjectBuilder returnObject = JSON.createObjectBuilder()
+                .add("timestamp", (resultTableResultSet.getRowCount() <= 0 ? 0
+                        : (long)resultTableResultSet.getDouble(0, 3)))
+                .add("balances", balancesArray.build());
+        if (!singleAccountMode) {
+            String nextLink = "/api/v1/tokens/" + tokenId + "/balances?order=" + direction + "&limit=" + limit +
+                    "&account.id=" + (direction.equalsIgnoreCase("asc") ? "gt" : "lt") + ":0.0." + highestAccountNumber;
+            returnObject.add("links", JSON.createObjectBuilder()
+                        .add("next", nextLink)
+                        .build());
+        }
         response.send(returnObject.build());
     }
 
