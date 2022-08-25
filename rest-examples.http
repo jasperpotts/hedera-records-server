@@ -84,6 +84,15 @@ GET http://localhost:8080/api/v1/tokens/629591/balances?account.id=gt:644000&acc
 GET http://localhost:8080/api/v1/tokens/629591/balances?account.id=644972&account.balance=500000000
 ### listTokenBalancesById specifying a token id and an account id and a particular timestamp -- not yet working
 GET http://localhost:8080/api/v1/tokens/629591/balances?account.id=644972&timestamp=1644887406787336960
+###
+### listNfts specifying only a token id
+GET http://localhost:8080/api/v1/tokens/1066828/nfts?limit=99
+### listNfts specifying a token id and an account id
+GET http://localhost:8080/api/v1/tokens/1066828/nfts?account.id=0
+### listNfts specifying a token id and a range of account ids
+GET http://localhost:8080/api/v1/tokens/1066828/nfts?account.id=gte:0&account.id=lt:9&limit=1000
+### listNfts specifying a token id and a range of account ids, sorted in descending order
+GET http://localhost:8080/api/v1/tokens/1066828/nfts?account.id=gte:0&account.id=lt:9&limit=1000&order=desc
 
 ### TRANSACTIONS
 ### get transactions by Id
@@ -120,4 +129,3 @@ Accept: application/json
 
 ### get nfts for an account id with filters
 GET http://localhost:8080/api/v1/accounts/0/nfts?deleted=false&serial_number=1871&token_id=1066828&limit=10&order=asc
-Accept: application/json

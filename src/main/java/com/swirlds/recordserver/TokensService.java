@@ -58,6 +58,7 @@ public class TokensService implements Service {
         rules.get("/", this::listTokens);
         rules.get("/{tokenId}", this::getTokenById);
         rules.get("/{tokenId}/balances", this::listTokenBalancesById);
+        rules.get("/{tokenId}/nfts", this::listNfts);
     }
 
     private void listTokens(ServerRequest request, ServerResponse response) {
@@ -367,6 +368,82 @@ GET http://localhost:8080/api/v1/tokens/629591/balances?account.id=644972&timest
                         .add("next", nextLink)
                         .build());
         }
+        response.send(returnObject.build());
+    }
+
+/**********************
+### listNfts specifying only a token id
+GET http://localhost:8080/api/v1/tokens/629591/nfts?limit=99
+### listNfts specifying a token id and an account id
+GET http://localhost:8080/api/v1/tokens/629591/nfts?account.id=644972
+### listNfts specifying a token id and a range of account ids
+GET http://localhost:8080/api/v1/tokens/629591/nfts?account.id=gt:644000&account.id=lt:644999&limit=1000
+### listNfts specifying a token id and a range of account ids, sorted in descending order
+GET http://localhost:8080/api/v1/tokens/629591/nfts?account.id=gt:644000&account.id=lt:644999&limit=1000&order=desc
+ **********************/
+    private void listNfts(ServerRequest request, ServerResponse response) {
+        final Optional<String> accountIdQueryParam = request.queryParams().first("account.id");
+        final Optional<String> limitParam = request.queryParams().first("limit");
+        final Optional<String> orderParam = request.queryParams().first("order");
+
+        // restrict query to only the tokenId passed in as a path parameter
+        final String tokenId = request.path().segments().get(0);
+
+        // build and execute query
+        final List<QueryParamUtil.WhereClause> whereClauses = new ArrayList<>();
+        whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._long, "token_id",
+                request.path().segments().get(0)));
+        accountIdQueryParam.ifPresent(s ->
+                whereClauses.add(QueryParamUtil.parseQueryString(QueryParamUtil.Type._string, "account_id", s)));
+
+        final String whereClause = whereClauses.isEmpty() ? "" : "where " +
+                QueryParamUtil.whereClausesToQuery(whereClauses);
+        final String direction = QueryParamUtil.Order.parse(orderParam).toString();
+        final int limit = parseLimitQueryString(limitParam); // limit
+        final String queryString =
+                "select consensus_timestamp, account_id, delegating_spender, deleted, metadata, serial_number, " +
+                "spender, token_id from nft " + whereClause + " order by account_id " + direction + " limit ?";
+        System.out.println("listNfts(): queryString = " + queryString);
+        final PreparedStatement statement = this.pinotConnection.prepareStatement(new Request("sql", queryString));
+        QueryParamUtil.applyWhereClausesToQuery(whereClauses, statement);
+        statement.setInt(whereClauses.size(), limit);
+        final ResultSetGroup pinotResultSetGroup = statement.execute();
+        final ResultSet resultTableResultSet = pinotResultSetGroup.getResultSet(0);
+
+        // format results to JSON
+        long nextAccountId = (direction.equalsIgnoreCase("asc") ? 0 : Long.MAX_VALUE);
+        final JsonArrayBuilder nftsArray = JSON.createArrayBuilder();
+        for (int i = 0; i < resultTableResultSet.getRowCount(); i++) {
+            final long consensusTime = resultTableResultSet.getLong(i, 0);
+            final long accountID = resultTableResultSet.getLong(i, 1);
+            nextAccountId = (direction.equalsIgnoreCase("asc") ? Math.max(nextAccountId, accountID) :
+                    Math.min(nextAccountId, accountID));
+            final String accountId = "0.0." + accountID;
+            final String delegatingSpender = "0.0." + resultTableResultSet.getLong(i, 2);
+            final Boolean deleted = Boolean.valueOf(resultTableResultSet.getString(i, 3));
+            final String metadata = resultTableResultSet.getString(i, 4);
+            final long serialNumber = resultTableResultSet.getLong(i, 5);
+            final String spender = "0.0." + resultTableResultSet.getLong(i, 6);
+
+            JsonObjectBuilder singleObject = JSON.createObjectBuilder();
+            addIfNotNull(singleObject, "account_id", accountId);
+            singleObject.add("created_timestamp", consensusTime);
+            singleObject.add("delegating_spender", delegatingSpender);
+            addIfNotNull(singleObject, "deleted", deleted);
+            addIfNotNull(singleObject, "metadata", metadata);
+            singleObject.add("modified_timestamp", consensusTime);
+            singleObject.add("serial_number", serialNumber);
+            singleObject.add("spender_id", spender);
+            singleObject.add("token_id", "0.0." + tokenId);
+            nftsArray.add(singleObject.build());
+        }
+        final String nextLink = "/api/v1/tokens/" + tokenId + "/nfts?order=" + direction + "&limit=" + limit +
+                "&account.id=" + (direction.equalsIgnoreCase("asc") ? "gt" : "lt") + ":0.0." + nextAccountId;
+        final JsonObjectBuilder returnObject = JSON.createObjectBuilder()
+                .add("nfts", nftsArray.build())
+                .add("links", JSON.createObjectBuilder()
+                        .add("next", nextLink)
+                        .build());
         response.send(returnObject.build());
     }
 
