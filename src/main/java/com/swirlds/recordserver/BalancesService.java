@@ -27,6 +27,7 @@ import java.util.Optional;
 import java.util.logging.Logger;
 
 import static com.swirlds.recordserver.util.QueryParamUtil.parseLimitQueryString;
+import static com.swirlds.recordserver.util.ServiceUtil.getAccountIdRangeFilter;
 
 /**
  * A service for balances API
@@ -71,51 +72,7 @@ public class BalancesService implements Service {
                 QueryParamUtil.parseQueryString(QueryParamUtil.Type._long,"account_id",accountIdParam.get()) : null;
         System.out.println("accountWhereClause = " + accountWhereClause);
 
-        long minAccount, maxAccount;
-        boolean singleAccountMode = false;
-        if (accountIdParam.isPresent()) {
-            if (accountWhereClause.comparator() == QueryParamUtil.Comparator.eq) {
-                whereClauses.add(accountWhereClause);
-                singleAccountMode = true;
-            } else if (accountWhereClause.comparator() == QueryParamUtil.Comparator.ne){
-                // TODO, not quite sure what this should do
-                singleAccountMode = true;
-            } else {
-                switch (accountWhereClause.comparator()) {
-                    case lt -> {
-                        maxAccount = Long.parseLong(accountWhereClause.value());
-                        minAccount = maxAccount-limit;
-                    }
-                    case lte -> {
-                        maxAccount = Long.parseLong(accountWhereClause.value())+1;
-                        minAccount = maxAccount-limit;
-                    }
-                    case gt -> {
-                        minAccount = Long.parseLong(accountWhereClause.value());
-                        maxAccount = minAccount+limit;
-                    }
-                    case gte -> {
-                        minAccount = Long.parseLong(accountWhereClause.value())-1;
-                        maxAccount = minAccount+limit;
-                    }
-                    default -> {
-                        minAccount = 0;
-                        maxAccount = minAccount+limit;
-                    }
-                }
-                whereClauses.add(new QueryParamUtil.WhereClause(QueryParamUtil.Type._long,"account_id",
-                        QueryParamUtil.Comparator.gt,Long.toString(minAccount)));
-                whereClauses.add(new QueryParamUtil.WhereClause(QueryParamUtil.Type._long,"account_id",
-                        QueryParamUtil.Comparator.lt,Long.toString(maxAccount)));
-            }
-        } else {
-            minAccount = 0;
-            maxAccount = limit;
-            whereClauses.add(new QueryParamUtil.WhereClause(QueryParamUtil.Type._long,"account_id",
-                    QueryParamUtil.Comparator.gt,Long.toString(minAccount)));
-            whereClauses.add(new QueryParamUtil.WhereClause(QueryParamUtil.Type._long,"account_id",
-                    QueryParamUtil.Comparator.lt,Long.toString(maxAccount)));
-        }
+        boolean singleAccountMode = getAccountIdRangeFilter(accountIdParam, whereClauses, limit, accountWhereClause);
         for (var where: whereClauses) {
             System.out.println("        where = " + where);
         }
