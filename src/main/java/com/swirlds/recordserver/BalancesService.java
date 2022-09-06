@@ -54,6 +54,7 @@ public class BalancesService implements Service {
     }
 
     private void getDefaultMessageHandler(ServerRequest request, ServerResponse response) {
+        // this routine has much in common with TokensService.listTokenBalancesById(); they should be kept in sync.
         final Optional<String> accountIdParam = request.queryParams().first("account.id");
         final Optional<String> accountBalanceQueryParam = request.queryParams().first("account.balance");
         final Optional<String> accountPubKeyParam = request.queryParams().first("account.publickey");
