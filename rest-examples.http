@@ -108,7 +108,7 @@ Accept: application/json
 GET http://localhost:8080/api/v1/transactions?account.id=98&limit=200&order=asc&type=CREDIT
 Accept: application/json
 ### get transactions by DEBIT type
-GET http://localhost:8080/api/v1/transactions?account.id=100&limit=2&order=asc&type=DEBIT
+GET http://localhost:8080/api/v1/transactions?account.id=11&limit=2&order=asc&type=DEBIT
 Accept: application/json
 
 
@@ -129,3 +129,11 @@ Accept: application/json
 
 ### get nfts for an account id with filters
 GET http://localhost:8080/api/v1/accounts/0/nfts?deleted=false&serial_number=1871&token_id=1066828&limit=10&order=asc
+
+### list accounts
+GET http://localhost:8080/api/v1/accounts?limit=100
+Accept: application/json
+
+### list accounts with filters
+GET http://localhost:8080/api/v1/accounts?account.balance<100000&account.id=96040&order=asc&balance=true
+Accept: application/json
